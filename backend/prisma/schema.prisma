@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CASHIER
+}
+
+enum SaleType {
+  WEIGHT
+  UNIT
+  BOTH
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+}
+
+enum MovementType {
+  ENTRY
+  SALE
+  ADJUSTMENT
+  LOSS
+  RETURN
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  name      String
+  role      Role     @default(CASHIER)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  sales     Sale[]
+
+  @@map("users")
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  color     String    @default("#3B82F6")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  products  Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          Int       @id @default(autoincrement())
+  name        String
+  sku         String?   @unique
+  barcode     String?   @unique
+  saleType    SaleType  @map("sale_type")
+  price       Decimal   @db.Decimal(10, 2)
+  cost        Decimal?  @db.Decimal(10, 2)
+  stockQty    Decimal   @default(0) @map("stock_qty") @db.Decimal(10, 3)
+  minStock    Decimal   @default(0) @map("min_stock") @db.Decimal(10, 3)
+  categoryId  Int       @map("category_id")
+  category    Category  @relation(fields: [categoryId], references: [id])
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  saleItems   SaleItem[]
+  movements   InventoryMovement[]
+
+  @@map("products")
+}
+
+model Sale {
+  id            Int           @id @default(autoincrement())
+  userId        Int           @map("user_id")
+  user          User          @relation(fields: [userId], references: [id])
+  subtotal      Decimal       @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod @map("payment_method")
+  amountPaid    Decimal       @map("amount_paid") @db.Decimal(10, 2)
+  changeAmount  Decimal       @default(0) @map("change_amount") @db.Decimal(10, 2)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  items         SaleItem[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id        Int     @id @default(autoincrement())
+  saleId    Int     @map("sale_id")
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  productId Int     @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Decimal @db.Decimal(10, 3)
+  unitPrice Decimal @map("unit_price") @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+
+  @@map("sale_items")
+}
+
+model InventoryMovement {
+  id          Int          @id @default(autoincrement())
+  productId   Int          @map("product_id")
+  product     Product      @relation(fields: [productId], references: [id])
+  type        MovementType
+  quantity    Decimal      @db.Decimal(10, 3)
+  previousQty Decimal      @map("previous_qty") @db.Decimal(10, 3)
+  newQty      Decimal      @map("new_qty") @db.Decimal(10, 3)
+  notes       String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@map("inventory_movements")
+}
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_config")
+}

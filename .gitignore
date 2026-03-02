@@ -1,0 +1,35 @@
+# Dependencias
+node_modules/
+# Build
+dist/
+dist-ssr/
+*.local
+# Entorno (SENSIBLE)
+.env
+backend/.env
+# Claude Code
+CLAUDE.md
+.claude/
+# Drivers binarios
+drivers/
+# Prisma local
+backend/prisma/*.db
+backend/prisma/*.db-journal
+# Logs
+*.log
+npm-debug.log*
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# Cache
+.cache/
+*.tsbuildinfo
