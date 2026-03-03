@@ -18,12 +18,21 @@ declare global {
 
 export function authenticate(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
+  const queryToken = req.query.token as string | undefined;
+
+  let token: string | null = null;
+
+  if (header?.startsWith("Bearer ")) {
+    token = header.slice(7);
+  } else if (queryToken) {
+    token = queryToken;
+  }
+
+  if (!token) {
     return res.status(401).json({ error: "Token requerido" });
   }
 
   try {
-    const token = header.slice(7);
     const payload = jwt.verify(token, env.JWT_SECRET) as AuthPayload;
     req.user = payload;
     next();

@@ -139,7 +139,12 @@ export function SalesPage() {
           <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">Venta #{detail.id}</h3>
-              <button onClick={() => setDetail(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => downloadTicket(detail.id)} className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs">
+                  Descargar Ticket
+                </button>
+                <button onClick={() => setDetail(null)} className="text-gray-400 hover:text-gray-600">&#10005;</button>
+              </div>
             </div>
             <div className="text-sm text-gray-500 mb-3">
               {formatDateTime(detail.createdAt)} — {detail.user.name}
