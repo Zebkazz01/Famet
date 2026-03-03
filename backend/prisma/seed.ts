@@ -1,7 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const prisma = new PrismaClient();
+
+function generateRecoveryCode(): string {
+  return crypto.randomBytes(4).toString("hex").toUpperCase();
+}
 
 async function main() {
   // Crear usuario admin
@@ -10,10 +15,16 @@ async function main() {
     where: { username: "admin" },
     update: {},
     create: {
+      cedula: "0000000000",
+      firstName: "Admin",
+      lastName: "Sistema",
+      phone: "",
+      email: "",
       username: "admin",
       password: adminPassword,
-      name: "Administrador",
       role: "ADMIN",
+      status: "ACTIVE",
+      recoveryCode: generateRecoveryCode(),
     },
   });
 
@@ -23,10 +34,16 @@ async function main() {
     where: { username: "cajero1" },
     update: {},
     create: {
+      cedula: "1111111111",
+      firstName: "Cajero",
+      lastName: "Ejemplo",
+      phone: "",
+      email: "",
       username: "cajero1",
       password: cashierPassword,
-      name: "Cajero 1",
       role: "CASHIER",
+      status: "ACTIVE",
+      recoveryCode: generateRecoveryCode(),
     },
   });
 

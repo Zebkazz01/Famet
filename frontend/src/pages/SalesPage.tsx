@@ -7,7 +7,7 @@ interface Sale {
   total: string;
   paymentMethod: string;
   createdAt: string;
-  user: { name: string };
+  user: { firstName: string; lastName: string };
   _count: { items: number };
 }
 
@@ -19,7 +19,7 @@ interface SaleDetail {
   amountPaid: string;
   changeAmount: string;
   createdAt: string;
-  user: { name: string };
+  user: { firstName: string; lastName: string };
   items: Array<{
     quantity: string;
     unitPrice: string;
@@ -118,7 +118,7 @@ export function SalesPage() {
               <tr key={s.id} className="border-t hover:bg-gray-50 cursor-pointer" onClick={() => viewDetail(s.id)}>
                 <td className="p-3">{s.id}</td>
                 <td className="p-3">{formatDateTime(s.createdAt)}</td>
-                <td className="p-3">{s.user.name}</td>
+                <td className="p-3">{`${s.user.firstName} ${s.user.lastName}`}</td>
                 <td className="p-3 text-center">{s._count.items}</td>
                 <td className="p-3">{payMethodLabel[s.paymentMethod]}</td>
                 <td className="p-3 text-right font-bold">{formatCurrency(s.total)}</td>
@@ -147,7 +147,7 @@ export function SalesPage() {
               </div>
             </div>
             <div className="text-sm text-gray-500 mb-3">
-              {formatDateTime(detail.createdAt)} — {detail.user.name}
+              {formatDateTime(detail.createdAt)} — {detail.user.firstName} {detail.user.lastName}
             </div>
             <div className="space-y-2 mb-4">
               {detail.items.map((item, i) => (

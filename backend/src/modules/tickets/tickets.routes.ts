@@ -11,7 +11,7 @@ router.get("/:id/ticket", authenticate, async (req: Request, res: Response) => {
     where: { id },
     include: {
       items: { include: { product: true } },
-      user: { select: { name: true } },
+      user: { select: { firstName: true, lastName: true } },
     },
   });
 

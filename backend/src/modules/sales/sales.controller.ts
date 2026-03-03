@@ -72,7 +72,7 @@ export async function createSale(req: Request, res: Response) {
       },
       include: {
         items: { include: { product: true } },
-        user: { select: { name: true } },
+        user: { select: { firstName: true, lastName: true } },
       },
     });
 
@@ -95,7 +95,7 @@ export async function getSales(req: Request, res: Response) {
   const sales = await prisma.sale.findMany({
     where,
     include: {
-      user: { select: { name: true } },
+      user: { select: { firstName: true, lastName: true } },
       _count: { select: { items: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -110,7 +110,7 @@ export async function getSale(req: Request, res: Response) {
     where: { id },
     include: {
       items: { include: { product: { include: { category: true } } } },
-      user: { select: { name: true } },
+      user: { select: { firstName: true, lastName: true } },
     },
   });
   if (!sale) return res.status(404).json({ error: "Venta no encontrada" });
