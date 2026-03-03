@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.3.0](https://github.com/Zebkazz01/Famet/compare/v1.2.0...v1.3.0) (2026-03-03)
+
+
+### Nuevas Funcionalidades
+
+* sistema de 3 roles (ADMIN, SUPERVISOR, VENDEDOR) con permisos granulares ([a0a4153](https://github.com/Zebkazz01/Famet/commit/a0a415354bcf41ebfcb68202dee3974871836a74))
+
 ## [1.2.0](https://github.com/Zebkazz01/Famet/compare/v1.1.0...v1.2.0) (2026-03-03)
 
 
