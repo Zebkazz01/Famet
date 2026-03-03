@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 1.1.0 (2026-03-03)
+
+
+### Nuevas Funcionalidades
+
+* tickets PDF, modal balanza, CLI interactivo, versionado automático ([4bae02b](https://github.com/Zebkazz01/Famet/commit/4bae02bbd0485534409384a22cd670cdf01bbfaf))
+
 ## 1.2.0 (2026-03-03)
 
 
