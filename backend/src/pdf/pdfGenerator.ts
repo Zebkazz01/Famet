@@ -9,7 +9,7 @@ interface SaleForPdf {
   paymentMethod: string;
   amountPaid: any;
   changeAmount: any;
-  user: { name: string };
+  user: { firstName: string; lastName: string };
   items: Array<{
     quantity: any;
     unitPrice: any;
@@ -52,7 +52,7 @@ export async function generateTicketPdf(sale: SaleForPdf): Promise<Buffer> {
     const date = new Date(sale.createdAt);
     doc.fontSize(8).text(`Ticket #${sale.id}`);
     doc.text(`Fecha: ${date.toLocaleDateString("es-MX")} ${date.toLocaleTimeString("es-MX")}`);
-    doc.text(`Atendió: ${sale.user.name}`);
+    doc.text(`Atendió: ${sale.user.firstName} ${sale.user.lastName}`);
 
     doc.text("─".repeat(38), { align: "center" });
 

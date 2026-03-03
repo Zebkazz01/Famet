@@ -9,8 +9,14 @@ export async function login(req: Request, res: Response) {
   const { username, password } = req.body as LoginInput;
 
   const user = await prisma.user.findUnique({ where: { username } });
-  if (!user || !user.active) {
+  if (!user) {
     return res.status(401).json({ error: "Credenciales inválidas" });
+  }
+  if (user.status === "PENDING") {
+    return res.status(403).json({ error: "Tu cuenta está pendiente de aprobación por el administrador" });
+  }
+  if (user.status === "DISABLED") {
+    return res.status(403).json({ error: "Tu cuenta ha sido deshabilitada" });
   }
 
   const valid = await bcrypt.compare(password, user.password);
@@ -29,7 +35,7 @@ export async function login(req: Request, res: Response) {
     user: {
       id: user.id,
       username: user.username,
-      name: user.name,
+      name: `${user.firstName} ${user.lastName}`,
       role: user.role,
     },
   });

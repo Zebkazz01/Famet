@@ -12,6 +12,12 @@ enum Role {
   CASHIER
 }
 
+enum UserStatus {
+  ACTIVE
+  PENDING
+  DISABLED
+}
+
 enum SaleType {
   WEIGHT
   UNIT
@@ -33,15 +39,20 @@ enum MovementType {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  password  String
-  name      String
-  role      Role     @default(CASHIER)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  sales     Sale[]
+  id           Int        @id @default(autoincrement())
+  cedula       String     @unique
+  firstName    String     @map("first_name")
+  lastName     String     @map("last_name")
+  phone        String?
+  email        String?
+  username     String     @unique
+  password     String
+  role         Role       @default(CASHIER)
+  status       UserStatus @default(PENDING)
+  recoveryCode String     @map("recovery_code")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  sales        Sale[]
 
   @@map("users")
 }
