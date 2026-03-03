@@ -13,3 +13,9 @@ export const createSaleSchema = z.object({
 });
 
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
+
+export const correctSaleSchema = z.object({
+  correctionReason: z.string().min(1, "El motivo de corrección es obligatorio"),
+});
+
+export type CorrectSaleInput = z.infer<typeof correctSaleSchema>;

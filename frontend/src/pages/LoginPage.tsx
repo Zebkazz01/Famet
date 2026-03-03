@@ -72,7 +72,7 @@ export function LoginPage() {
         </form>
 
         <p className="text-xs text-gray-400 text-center mt-4">
-          admin / admin123
+          admin / admin123 | supervisor1 / super123 | cajero1 / cajero123
         </p>
       </div>
     </div>

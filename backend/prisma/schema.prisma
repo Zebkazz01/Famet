@@ -9,7 +9,13 @@ datasource db {
 
 enum Role {
   ADMIN
-  CASHIER
+  SUPERVISOR
+  VENDEDOR
+}
+
+enum CashMovementType {
+  CASH_IN
+  CASH_OUT
 }
 
 enum UserStatus {
@@ -47,12 +53,14 @@ model User {
   email        String?
   username     String     @unique
   password     String
-  role         Role       @default(CASHIER)
-  status       UserStatus @default(PENDING)
-  recoveryCode String     @map("recovery_code")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
-  sales        Sale[]
+  role           Role       @default(VENDEDOR)
+  status         UserStatus @default(PENDING)
+  recoveryCode   String     @map("recovery_code")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  sales          Sale[]
+  cashMovements  CashMovement[]
+  cashClosings   CashClosing[]
 
   @@map("users")
 }
@@ -99,8 +107,12 @@ model Sale {
   paymentMethod PaymentMethod @map("payment_method")
   amountPaid    Decimal       @map("amount_paid") @db.Decimal(10, 2)
   changeAmount  Decimal       @default(0) @map("change_amount") @db.Decimal(10, 2)
-  createdAt     DateTime      @default(now()) @map("created_at")
-  items         SaleItem[]
+  corrected        Boolean       @default(false)
+  correctionReason String?       @map("correction_reason")
+  correctedBy      Int?          @map("corrected_by")
+  correctedAt      DateTime?     @map("corrected_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  items            SaleItem[]
 
   @@map("sales")
 }
@@ -127,9 +139,35 @@ model InventoryMovement {
   previousQty Decimal      @map("previous_qty") @db.Decimal(10, 3)
   newQty      Decimal      @map("new_qty") @db.Decimal(10, 3)
   notes       String?
+  userId      Int?         @map("user_id")
   createdAt   DateTime     @default(now()) @map("created_at")
 
   @@map("inventory_movements")
+}
+
+model CashMovement {
+  id        Int              @id @default(autoincrement())
+  type      CashMovementType
+  amount    Decimal          @db.Decimal(10, 2)
+  reason    String
+  userId    Int              @map("user_id")
+  user      User             @relation(fields: [userId], references: [id])
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@map("cash_movements")
+}
+
+model CashClosing {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  user           User     @relation(fields: [userId], references: [id])
+  expectedAmount Decimal  @map("expected_amount") @db.Decimal(10, 2)
+  actualAmount   Decimal  @map("actual_amount") @db.Decimal(10, 2)
+  difference     Decimal  @db.Decimal(10, 2)
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("cash_closings")
 }
 
 model SystemConfig {

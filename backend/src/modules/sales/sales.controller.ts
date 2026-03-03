@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "../../config/database";
-import { CreateSaleInput } from "./sales.schema";
+import { CreateSaleInput, CorrectSaleInput } from "./sales.schema";
 import { AppError } from "../../middleware/errorHandler";
 
 export async function createSale(req: Request, res: Response) {
@@ -92,6 +92,11 @@ export async function getSales(req: Request, res: Response) {
     if (to) where.createdAt.lte = new Date(String(to) + "T23:59:59");
   }
 
+  // VENDEDOR solo ve sus propias ventas
+  if (req.user!.role === "VENDEDOR") {
+    where.userId = req.user!.userId;
+  }
+
   const sales = await prisma.sale.findMany({
     where,
     include: {
@@ -160,4 +165,35 @@ export async function getDailySummary(req: Request, res: Response) {
   };
 
   return res.json({ date, totalSales, totalRevenue, topProducts, byPayment });
+}
+
+export async function correctSale(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const { correctionReason } = req.body as CorrectSaleInput;
+  const userId = req.user!.userId;
+  const userRole = req.user!.role;
+
+  const sale = await prisma.sale.findUnique({ where: { id } });
+  if (!sale) return res.status(404).json({ error: "Venta no encontrada" });
+
+  // VENDEDOR solo puede corregir sus propias ventas
+  if (userRole === "VENDEDOR" && sale.userId !== userId) {
+    return res.status(403).json({ error: "Solo puedes corregir tus propias ventas" });
+  }
+
+  const updated = await prisma.sale.update({
+    where: { id },
+    data: {
+      corrected: true,
+      correctionReason,
+      correctedBy: userId,
+      correctedAt: new Date(),
+    },
+    include: {
+      user: { select: { firstName: true, lastName: true } },
+      items: { include: { product: true } },
+    },
+  });
+
+  return res.json(updated);
 }

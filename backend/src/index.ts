@@ -16,6 +16,8 @@ import productsRoutes from "./modules/products/products.routes";
 import salesRoutes from "./modules/sales/sales.routes";
 import ticketsRoutes from "./modules/tickets/tickets.routes";
 import inventoryRoutes from "./modules/inventory/inventory.routes";
+import cashRoutes from "./modules/cash/cash.routes";
+import dashboardRoutes from "./modules/dashboard/dashboard.routes";
 import { authenticate, authorize } from "./middleware/auth";
 
 const startTime = Date.now();
@@ -50,6 +52,8 @@ app.use("/api/products", productsRoutes);
 app.use("/api/sales", salesRoutes);
 app.use("/api/sales", ticketsRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/cash", cashRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // Rutas de la balanza (REST)
 const scaleManager = new ScaleManager(env.SCALE_PORT, env.SCALE_BAUD_RATE);

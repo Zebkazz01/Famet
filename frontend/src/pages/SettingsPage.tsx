@@ -15,7 +15,7 @@ export function SettingsPage() {
   const {
     connected, weight, rawWeight, stable, unit, tareActive, tareOffset,
     processorConfig, inputUnit, tare, clearTare, setUnit, setInputUnit,
-    updateProcessorConfig, resetProcessor, disabled, enableScale, status,
+    updateProcessorConfig, resetProcessor, disabled, enableScale, disableScale, status,
   } = useScale();
   const [ports, setPorts] = useState<Port[]>([]);
   const [config, setConfig] = useState<Record<string, string>>({});
@@ -111,26 +111,33 @@ export function SettingsPage() {
 
       {tab === 'scale' && (
         <div className="space-y-6">
-          {/* Aviso de balanza deshabilitada */}
-          {disabled && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6 text-yellow-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                </svg>
-                <div>
-                  <p className="font-medium text-yellow-800">Balanza deshabilitada</p>
-                  <p className="text-sm text-yellow-600">El sistema está funcionando sin balanza. Presiona el botón para reconectar.</p>
-                </div>
+          {/* Toggle habilitar/deshabilitar balanza */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-bold">Balanza habilitada</h2>
+                <p className="text-sm text-gray-500">
+                  {disabled
+                    ? 'La balanza esta deshabilitada. No se intentara conectar automaticamente.'
+                    : 'La balanza intentara conectarse al iniciar el sistema.'}
+                </p>
               </div>
               <button
-                onClick={() => { enableScale(); toast.success('Reconectando balanza...'); }}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm shrink-0"
+                onClick={() => {
+                  if (disabled) {
+                    enableScale();
+                    toast.success('Balanza habilitada. Reconectando...');
+                  } else {
+                    disableScale();
+                    toast.success('Balanza deshabilitada');
+                  }
+                }}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${disabled ? 'bg-gray-300' : 'bg-green-500'}`}
               >
-                Reconectar Balanza
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${disabled ? 'translate-x-1' : 'translate-x-6'}`} />
               </button>
             </div>
-          )}
+          </div>
 
           {/* Estado actual */}
           <div className="bg-white rounded-lg shadow p-4">

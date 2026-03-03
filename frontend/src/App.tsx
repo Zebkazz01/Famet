@@ -11,6 +11,8 @@ import { ProductsPage } from './pages/ProductsPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { SalesPage } from './pages/SalesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { CashPage } from './pages/CashPage';
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -20,10 +22,12 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route path="/" element={<POSPage />} />
-        <Route path="/products" element={<ProtectedRoute adminOnly><ProductsPage /></ProtectedRoute>} />
-        <Route path="/inventory" element={<ProtectedRoute adminOnly><InventoryPage /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute roles={['ADMIN', 'SUPERVISOR']}><DashboardPage /></ProtectedRoute>} />
+        <Route path="/products" element={<ProtectedRoute roles={['ADMIN', 'SUPERVISOR']}><ProductsPage /></ProtectedRoute>} />
+        <Route path="/inventory" element={<ProtectedRoute roles={['ADMIN', 'SUPERVISOR']}><InventoryPage /></ProtectedRoute>} />
         <Route path="/sales" element={<SalesPage />} />
-        <Route path="/settings" element={<ProtectedRoute adminOnly><SettingsPage /></ProtectedRoute>} />
+        <Route path="/cash" element={<CashPage />} />
+        <Route path="/settings" element={<ProtectedRoute roles={['ADMIN']}><SettingsPage /></ProtectedRoute>} />
       </Route>
     </Routes>
   );

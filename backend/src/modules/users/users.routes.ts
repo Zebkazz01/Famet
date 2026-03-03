@@ -22,7 +22,7 @@ const createUserSchema = z.object({
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   username: z.string().min(3, "Usuario mínimo 3 caracteres"),
   password: z.string().min(4, "Contraseña mínimo 4 caracteres"),
-  role: z.enum(["ADMIN", "CASHIER"]).default("CASHIER"),
+  role: z.enum(["ADMIN", "SUPERVISOR", "VENDEDOR"]).default("VENDEDOR"),
 });
 
 const updateUserSchema = z.object({
@@ -31,7 +31,7 @@ const updateUserSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   password: z.string().min(4).optional(),
-  role: z.enum(["ADMIN", "CASHIER"]).optional(),
+  role: z.enum(["ADMIN", "SUPERVISOR", "VENDEDOR"]).optional(),
   status: z.enum(["ACTIVE", "PENDING", "DISABLED"]).optional(),
 });
 

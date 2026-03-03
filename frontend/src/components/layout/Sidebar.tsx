@@ -3,15 +3,23 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useScale } from '../../contexts/ScaleContext';
 
 const navItems = [
-  { to: '/', label: 'Punto de Venta', icon: '🏪', roles: ['ADMIN', 'CASHIER'] },
-  { to: '/products', label: 'Productos', icon: '📦', roles: ['ADMIN'] },
-  { to: '/inventory', label: 'Inventario', icon: '📋', roles: ['ADMIN'] },
-  { to: '/sales', label: 'Historial Ventas', icon: '📊', roles: ['ADMIN', 'CASHIER'] },
+  { to: '/', label: 'Punto de Venta', icon: '🏪', roles: ['ADMIN', 'VENDEDOR'] },
+  { to: '/dashboard', label: 'Dashboard', icon: '📈', roles: ['ADMIN', 'SUPERVISOR'] },
+  { to: '/products', label: 'Productos', icon: '📦', roles: ['ADMIN', 'SUPERVISOR'] },
+  { to: '/inventory', label: 'Inventario', icon: '📋', roles: ['ADMIN', 'SUPERVISOR'] },
+  { to: '/sales', label: 'Historial Ventas', icon: '📊', roles: ['ADMIN', 'SUPERVISOR', 'VENDEDOR'] },
+  { to: '/cash', label: 'Caja', icon: '💰', roles: ['ADMIN', 'SUPERVISOR', 'VENDEDOR'] },
   { to: '/settings', label: 'Configuración', icon: '⚙️', roles: ['ADMIN'] },
 ];
 
+const roleLabels: Record<string, string> = {
+  ADMIN: 'Admin',
+  SUPERVISOR: 'Supervisor',
+  VENDEDOR: 'Vendedor',
+};
+
 export function Sidebar() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout } = useAuth();
   const { connected } = useScale();
 
   return (
@@ -48,7 +56,7 @@ export function Sidebar() {
           </span>
         </div>
         <div className="text-sm text-gray-300 mb-2">
-          {user?.name} ({isAdmin ? 'Admin' : 'Cajero'})
+          {user?.name} ({roleLabels[user?.role || ''] || user?.role})
         </div>
         <button
           onClick={logout}

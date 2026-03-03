@@ -85,7 +85,7 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
   const [processorConfig, setProcessorConfig] = useState<ProcessorConfig | null>(null);
   const [inputUnit, setInputUnitState] = useState<WeightUnit>('kg');
   const [status, setStatus] = useState<ScaleStatus>('connecting');
-  const [disabled, setDisabled] = useState(false);
+  const [disabled, setDisabled] = useState(() => localStorage.getItem('scale_disabled') === 'true');
   const socketRef = useRef<Socket | null>(null);
 
   const connectSocket = useCallback(() => {
@@ -156,6 +156,8 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!disabled) {
       connectSocket();
+    } else {
+      setStatus('disabled');
     }
     return () => {
       socketRef.current?.disconnect();
@@ -198,10 +200,12 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
     setWeight(0);
     setRawWeight(0);
     setStable(false);
+    localStorage.setItem('scale_disabled', 'true');
   }, []);
 
   const enableScale = useCallback(() => {
     setDisabled(false);
+    localStorage.removeItem('scale_disabled');
     connectSocket();
   }, [connectSocket]);
 

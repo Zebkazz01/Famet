@@ -1,7 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-export function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
+interface Props {
+  children: React.ReactNode;
+  roles?: string[];
+  adminOnly?: boolean; // backward compat
+}
+
+export function ProtectedRoute({ children, roles, adminOnly = false }: Props) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -13,7 +19,16 @@ export function ProtectedRoute({ children, adminOnly = false }: { children: Reac
   }
 
   if (!user) return <Navigate to="/login" replace />;
-  if (adminOnly && user.role !== 'ADMIN') return <Navigate to="/" replace />;
+
+  // roles prop takes precedence
+  if (roles && roles.length > 0 && !roles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  // fallback: adminOnly
+  if (!roles && adminOnly && user.role !== 'ADMIN') {
+    return <Navigate to="/" replace />;
+  }
 
   return <>{children}</>;
 }

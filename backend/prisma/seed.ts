@@ -28,8 +28,27 @@ async function main() {
     },
   });
 
-  // Crear cajero de ejemplo
-  const cashierPassword = await bcrypt.hash("cajero123", 10);
+  // Crear supervisor de ejemplo
+  const supervisorPassword = await bcrypt.hash("super123", 10);
+  await prisma.user.upsert({
+    where: { username: "supervisor1" },
+    update: {},
+    create: {
+      cedula: "2222222222",
+      firstName: "Supervisor",
+      lastName: "Ejemplo",
+      phone: "",
+      email: "",
+      username: "supervisor1",
+      password: supervisorPassword,
+      role: "SUPERVISOR",
+      status: "ACTIVE",
+      recoveryCode: generateRecoveryCode(),
+    },
+  });
+
+  // Crear vendedor de ejemplo
+  const vendedorPassword = await bcrypt.hash("cajero123", 10);
   await prisma.user.upsert({
     where: { username: "cajero1" },
     update: {},
@@ -40,8 +59,8 @@ async function main() {
       phone: "",
       email: "",
       username: "cajero1",
-      password: cashierPassword,
-      role: "CASHIER",
+      password: vendedorPassword,
+      role: "VENDEDOR",
       status: "ACTIVE",
       recoveryCode: generateRecoveryCode(),
     },
