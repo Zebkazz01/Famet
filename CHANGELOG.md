@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.0](https://github.com/Zebkazz01/Famet/compare/v1.1.0...v1.2.0) (2026-03-03)
+
+
+### Nuevas Funcionalidades
+
+* modelo de usuarios con cédula, estados y recuperación de contraseña ([d0ec74a](https://github.com/Zebkazz01/Famet/commit/d0ec74acaebef34f7de3633b3ea163c1cc9bfca8))
+
 ## 1.1.0 (2026-03-03)
 
 
