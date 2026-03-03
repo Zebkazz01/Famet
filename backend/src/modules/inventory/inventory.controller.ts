@@ -6,6 +6,7 @@ import { AppError } from "../../middleware/errorHandler";
 
 export async function createMovement(req: Request, res: Response) {
   const input = req.body as CreateMovementInput;
+  const userId = req.user!.userId;
 
   const movement = await prisma.$transaction(async (tx) => {
     const product = await tx.product.findUnique({ where: { id: input.productId } });
@@ -37,6 +38,7 @@ export async function createMovement(req: Request, res: Response) {
         previousQty: product.stockQty,
         newQty,
         notes: input.notes || null,
+        userId,
       },
       include: { product: true },
     });

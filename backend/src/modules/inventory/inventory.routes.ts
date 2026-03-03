@@ -6,8 +6,8 @@ import { createMovement, getMovements, getAlerts } from "./inventory.controller"
 
 const router = Router();
 
-router.get("/movements", authenticate, getMovements);
-router.post("/movements", authenticate, authorize("ADMIN"), validate(createMovementSchema), createMovement);
-router.get("/alerts", authenticate, getAlerts);
+router.get("/movements", authenticate, authorize("ADMIN", "SUPERVISOR"), getMovements);
+router.post("/movements", authenticate, authorize("ADMIN", "SUPERVISOR"), validate(createMovementSchema), createMovement);
+router.get("/alerts", authenticate, authorize("ADMIN", "SUPERVISOR"), getAlerts);
 
 export default router;
