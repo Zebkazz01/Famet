@@ -10,18 +10,30 @@ function currentToken(): string | undefined {
   }
 }
 
+// Detect demo mode (Vercel deployment)
+function isDemoMode(): boolean {
+  return import.meta.env.VITE_API_URL === '/api' || 
+         window.location.hostname.includes('vercel.app');
+}
+
 /**
  * Singleton del socket raíz (namespace `/`). Reusado por notificaciones,
  * config:updated y futuras emisiones cross-módulo. ScaleContext mantiene
  * su propio socket en namespace `/scale`.
  */
-export function getRootSocket(): Socket {
+export function getRootSocket(): Socket | null {
+  // In demo mode (Vercel), WebSockets aren't supported
+  if (isDemoMode()) {
+    console.log('[FAMEAT] Demo mode - Socket.IO disabled');
+    return null;
+  }
+
   if (rootSocket && rootSocket.connected) return rootSocket;
   if (rootSocket) {
-    // Existe pero desconectado — intentar reconectar
     rootSocket.connect();
     return rootSocket;
   }
+  
   rootSocket = io('/', {
     transports: ['websocket', 'polling'],
     reconnectionAttempts: Infinity,

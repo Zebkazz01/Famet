@@ -95,6 +95,17 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
 
   const connectSocket = useCallback(() => {
+    // Demo mode (Vercel) - no WebSocket support
+    const isDemo = import.meta.env.VITE_API_URL === '/api' || 
+                   window.location.hostname.includes('vercel.app');
+    
+    if (isDemo) {
+      console.log('[FAMEAT] Demo mode - Scale disabled');
+      setStatus('disabled');
+      setConnected(false);
+      return;
+    }
+
     // Limpiar socket anterior si existe
     if (socketRef.current) {
       socketRef.current.disconnect();
@@ -160,10 +171,13 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
 
   // Conectar al montar (si no está deshabilitada)
   useEffect(() => {
-    if (!disabled) {
-      connectSocket();
-    } else {
+    const isDemo = import.meta.env.VITE_API_URL === '/api' || 
+                   window.location.hostname.includes('vercel.app');
+    
+    if (isDemo || disabled) {
       setStatus('disabled');
+    } else {
+      connectSocket();
     }
     return () => {
       socketRef.current?.disconnect();
