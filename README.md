@@ -85,6 +85,31 @@ El sistema funciona como una **PWA (Progressive Web App)** instalable en disposi
 
 ## Stack Tecnológico
 
+### Arquitectura
+
+| Patrón | Descripción |
+|--------|-------------|
+| **Stack** | **PERN** (PostgreSQL, Express, React, Node.js) |
+| **Patrón Backend** | **Arquitectura Modular** (controller + routes + schema por módulo) |
+| **Patrón Frontend** | **Component-Based** (React Context + Custom Hooks + Pages) |
+| **Monorepo** | npm workspaces (backend + frontend) |
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     FAMEAT POS (PERN)                       │
+├─────────────────────────────────────────────────────────────┤
+│  Frontend (React)     │  Backend (Express)    │  Database   │
+│  ─────────────────    │  ──────────────────   │  ─────────  │
+│  • Pages              │  • Modules            │  PostgreSQL │
+│  • Components         │    ├─ controller.ts   │  (Prisma)   │
+│  • Contexts           │    ├─ routes.ts       │             │
+│  • Hooks              │    └─ schema.ts       │             │
+│  • API Client         │  • Jobs (cron)        │             │
+│                       │  • PDF Generator      │             │
+│                       │  • Scale Manager      │             │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ### Backend
 
 | Componente | Tecnología | Versión |
@@ -696,6 +721,31 @@ The system works as an installable **PWA (Progressive Web App)** on mobile and d
 ---
 
 ## Tech Stack
+
+### Architecture
+
+| Pattern | Description |
+|---------|-------------|
+| **Stack** | **PERN** (PostgreSQL, Express, React, Node.js) |
+| **Backend Pattern** | **Modular Architecture** (controller + routes + schema per module) |
+| **Frontend Pattern** | **Component-Based** (React Context + Custom Hooks + Pages) |
+| **Monorepo** | npm workspaces (backend + frontend) |
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     FAMEAT POS (PERN)                       │
+├─────────────────────────────────────────────────────────────┤
+│  Frontend (React)     │  Backend (Express)    │  Database   │
+│  ─────────────────    │  ──────────────────   │  ─────────  │
+│  • Pages              │  • Modules            │  PostgreSQL │
+│  • Components         │    ├─ controller.ts   │  (Prisma)   │
+│  • Contexts           │    ├─ routes.ts       │             │
+│  • Hooks              │    └─ schema.ts       │             │
+│  • API Client         │  • Jobs (cron)        │             │
+│                       │  • PDF Generator      │             │
+│                       │  • Scale Manager      │             │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ### Backend
 
