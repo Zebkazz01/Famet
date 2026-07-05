@@ -126,7 +126,7 @@ async function main() {
   const configs = [
     { key: "scale_port", value: "COM3" },
     { key: "scale_baud_rate", value: "9600" },
-    { key: "business_name", value: "FAMEAT" },
+    { key: "business_name", value: "Mi Negocio" },
     { key: "business_address", value: "" },
     { key: "business_phone", value: "" },
   ];

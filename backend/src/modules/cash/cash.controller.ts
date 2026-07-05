@@ -7,19 +7,31 @@ export async function createCashMovement(req: Request, res: Response) {
   const input = req.body as CreateCashMovementInput;
   const userId = req.user!.userId;
 
-  const movement = await prisma.cashMovement.create({
-    data: {
-      type: input.type,
-      amount: input.amount,
-      reason: input.reason,
-      userId,
-    },
-    include: {
-      user: { select: { firstName: true, lastName: true } },
-    },
-  });
-
-  return res.status(201).json(movement);
+  try {
+    const movement = await prisma.cashMovement.create({
+      data: {
+        type: input.type,
+        amount: input.amount,
+        reason: input.reason,
+        source: (input.source ?? "MANUAL") as any,
+        userId,
+      },
+      include: {
+        user: { select: { firstName: true, lastName: true } },
+      },
+    });
+    return res.status(201).json(movement);
+  } catch (e: any) {
+    if (e?.message?.includes("source") || e?.code === "P2009") {
+      // Prisma client aún no regenerado — crear sin source (DB usa default 'MANUAL')
+      const movement = await prisma.cashMovement.create({
+        data: { type: input.type, amount: input.amount, reason: input.reason, userId } as any,
+        include: { user: { select: { firstName: true, lastName: true } } },
+      });
+      return res.status(201).json(movement);
+    }
+    throw e;
+  }
 }
 
 export async function getCashMovements(req: Request, res: Response) {
@@ -28,21 +40,26 @@ export async function getCashMovements(req: Request, res: Response) {
   const where: any = {};
   if (date) {
     const day = String(date);
-    where.createdAt = {
-      gte: new Date(day + "T00:00:00"),
-      lte: new Date(day + "T23:59:59"),
-    };
+    const [y, m, d] = day.split("-").map(Number);
+    if (y && m && d) {
+      const start = new Date(y, m - 1, d, 0, 0, 0, 0);
+      const end = new Date(y, m - 1, d, 23, 59, 59, 999);
+      where.createdAt = { gte: start, lte: end };
+    }
   }
 
-  const movements = await prisma.cashMovement.findMany({
-    where,
-    include: {
-      user: { select: { firstName: true, lastName: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  return res.json(movements);
+  try {
+    const movements = await prisma.cashMovement.findMany({
+      where,
+      include: {
+        user: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return res.json(movements);
+  } catch (e: any) {
+    return res.status(500).json({ error: "Error al consultar movimientos: " + e.message });
+  }
 }
 
 export async function createCashClosing(req: Request, res: Response) {

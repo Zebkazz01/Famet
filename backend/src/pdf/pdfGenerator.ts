@@ -1,4 +1,6 @@
 import PDFDocument from "pdfkit";
+import path from "path";
+import fs from "fs";
 import { prisma } from "../config/database";
 
 interface SaleForPdf {
@@ -22,9 +24,18 @@ export async function generateTicketPdf(sale: SaleForPdf): Promise<Buffer> {
   const config = await prisma.systemConfig.findMany();
   const getConfig = (key: string) => config.find((c) => c.key === key)?.value || "";
 
-  const businessName = getConfig("business_name") || "FAMEAT";
+  const businessName = getConfig("business_name") || "POS";
   const businessAddress = getConfig("business_address");
   const businessPhone = getConfig("business_phone");
+  const businessLogo = getConfig("business_logo");
+
+  // Resolver path absoluto del logo (puede ser "/uploads/logo/logo.png")
+  let logoPath: string | null = null;
+  if (businessLogo) {
+    const rel = businessLogo.replace(/^\//, "");
+    const abs = path.join(process.cwd(), rel);
+    if (fs.existsSync(abs)) logoPath = abs;
+  }
 
   return new Promise((resolve, reject) => {
     // Ticket térmico: 80mm ~= 226 pts
@@ -39,6 +50,20 @@ export async function generateTicketPdf(sale: SaleForPdf): Promise<Buffer> {
     doc.on("error", reject);
 
     const w = 206; // ancho útil
+
+    // Logo (si existe) centrado arriba
+    if (logoPath) {
+      try {
+        const logoW = 60;
+        const x = (226 - logoW) / 2;
+        const startY = doc.y;
+        doc.image(logoPath, x, startY, { width: logoW });
+        // pdfkit no avanza cursor con x/y explícito; estimar alto cuadrado
+        doc.y = startY + logoW + 4;
+      } catch {
+        // Logo inválido — ignorar silenciosamente
+      }
+    }
 
     // Encabezado
     doc.fontSize(14).font("Helvetica-Bold").text(businessName, { align: "center" });
