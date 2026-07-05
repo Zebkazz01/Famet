@@ -1,21 +1,18 @@
-// Mock products data
 const PRODUCTS = [
-  { id: 1, name: 'Huevos AA', sku: 'HUE-001', barcode: '7701234567890', saleType: 'BOTH', price: 15000, cost: 9500, stockQty: 150, minStock: 20, categoryId: 1, active: true, weightUnit: 'ud', imageUrl: null, unitsPerPack: 30, subUnitName: 'Huevo', subUnitPrice: 500, animalType: null, animalPart: null, cookingMethods: [], category: { id: 1, name: 'Lácteos', color: '#10B981' } },
-  { id: 2, name: 'Muslo de Pollo', sku: 'POL-001', barcode: '7701234567891', saleType: 'WEIGHT', price: 9500, cost: 6200, stockQty: 25.5, minStock: 5, categoryId: 2, active: true, weightUnit: 'lb', imageUrl: null, unitsPerPack: null, subUnitName: null, subUnitPrice: null, animalType: 'POLLO', animalPart: 'Muslo', cookingMethods: ['Asado', 'Frito'], category: { id: 2, name: 'Carnes', color: '#EF4444' } },
-  { id: 3, name: 'Pechuga de Pollo', sku: 'POL-002', barcode: '7701234567892', saleType: 'WEIGHT', price: 12000, cost: 7800, stockQty: 18.3, minStock: 5, categoryId: 2, active: true, weightUnit: 'lb', imageUrl: null, unitsPerPack: null, subUnitName: null, subUnitPrice: null, animalType: 'POLLO', animalPart: 'Pechuga', cookingMethods: ['Asado', 'Plancha'], category: { id: 2, name: 'Carnes', color: '#EF4444' } },
-  { id: 4, name: 'Lomo de Res', sku: 'RES-001', barcode: '7701234567893', saleType: 'WEIGHT', price: 28000, cost: 18500, stockQty: 12.8, minStock: 3, categoryId: 2, active: true, weightUnit: 'lb', imageUrl: null, unitsPerPack: null, subUnitName: null, subUnitPrice: null, animalType: 'RES', animalPart: 'Lomo', cookingMethods: ['Asado', 'Plancha'], category: { id: 2, name: 'Carnes', color: '#EF4444' } },
-  { id: 5, name: 'Cerveza Águila', sku: 'BEB-001', barcode: '7701234567894', saleType: 'UNIT', price: 3500, cost: 2100, stockQty: 48, minStock: 12, categoryId: 3, active: true, weightUnit: 'und', imageUrl: null, unitsPerPack: 12, subUnitName: null, subUnitPrice: null, animalType: null, animalPart: null, cookingMethods: [], category: { id: 3, name: 'Bebidas', color: '#3B82F6' } },
-  { id: 6, name: 'Chorizo artesanal', sku: 'EMB-001', barcode: '7701234567895', saleType: 'WEIGHT', price: 18000, cost: 11000, stockQty: 8.2, minStock: 2, categoryId: 4, active: true, weightUnit: 'lb', imageUrl: null, unitsPerPack: null, subUnitName: null, subUnitPrice: null, animalType: 'CERDO', animalPart: 'Chorizo', cookingMethods: ['Asado', 'Frito'], category: { id: 4, name: 'Embutidos', color: '#F59E0B' } },
-  { id: 7, name: 'Camarón importado', sku: 'MAR-001', barcode: '7701234567896', saleType: 'WEIGHT', price: 45000, cost: 32000, stockQty: 5.5, minStock: 2, categoryId: 5, active: true, weightUnit: 'lb', imageUrl: null, unitsPerPack: null, subUnitName: null, subUnitPrice: null, animalType: 'MARISCO', animalPart: 'Camarón', cookingMethods: ['Salteado', 'Frito'], category: { id: 5, name: 'Mariscos', color: '#06B6D4' } },
-  { id: 8, name: 'Gaseosa Coca-Cola 1.5L', sku: 'BEB-002', barcode: '7701234567897', saleType: 'UNIT', price: 5500, cost: 3200, stockQty: 36, minStock: 10, categoryId: 3, active: true, weightUnit: 'und', imageUrl: null, unitsPerPack: 6, subUnitName: null, subUnitPrice: null, animalType: null, animalPart: null, cookingMethods: [], category: { id: 3, name: 'Bebidas', color: '#3B82F6' } }
+  { id: 1, name: 'Huevos AA', price: 15000, stockQty: 150, saleType: 'BOTH', weightUnit: 'ud', category: { id: 1, name: 'Lácteos', color: '#10B981' }, subUnitPrice: 500, subUnitName: 'Huevo', unitsPerPack: 30 },
+  { id: 2, name: 'Muslo de Pollo', price: 9500, stockQty: 25.5, saleType: 'WEIGHT', weightUnit: 'lb', category: { id: 2, name: 'Carnes', color: '#EF4444' } },
+  { id: 3, name: 'Pechuga de Pollo', price: 12000, stockQty: 18.3, saleType: 'WEIGHT', weightUnit: 'lb', category: { id: 2, name: 'Carnes', color: '#EF4444' } },
+  { id: 4, name: 'Lomo de Res', price: 28000, stockQty: 12.8, saleType: 'WEIGHT', weightUnit: 'lb', category: { id: 2, name: 'Carnes', color: '#EF4444' } },
+  { id: 5, name: 'Cerveza Águila', price: 3500, stockQty: 48, saleType: 'UNIT', weightUnit: 'und', category: { id: 3, name: 'Bebidas', color: '#3B82F6' } },
+  { id: 6, name: 'Chorizo artesanal', price: 18000, stockQty: 8.2, saleType: 'WEIGHT', weightUnit: 'lb', category: { id: 4, name: 'Embutidos', color: '#F59E0B' } },
+  { id: 7, name: 'Camarón importado', price: 45000, stockQty: 5.5, saleType: 'WEIGHT', weightUnit: 'lb', category: { id: 5, name: 'Mariscos', color: '#06B6D4' } },
+  { id: 8, name: 'Gaseosa Coca-Cola 1.5L', price: 5500, stockQty: 36, saleType: 'UNIT', weightUnit: 'und', category: { id: 3, name: 'Bebidas', color: '#3B82F6' } }
 ];
 
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  
-  return res.status(200).json({ data: PRODUCTS.filter(p => p.active) });
+  return res.status(200).json({ data: PRODUCTS });
 }
