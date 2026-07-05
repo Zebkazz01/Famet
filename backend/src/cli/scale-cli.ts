@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * CLI de diagnóstico para la balanza FAMEAT
+ * CLI de diagnóstico para la balanza
  *
  * Uso:
  *   npx tsx src/cli/scale-cli.ts                       → Menú interactivo
@@ -512,7 +512,7 @@ async function showConfig() {
 
 function printMenu() {
   log(`\n${c.bold}${c.red}═════════════════════════════════════════${c.reset}`);
-  log(`${c.bold}   FAMEAT - CLI Balanza / Diagnóstico${c.reset}`);
+  log(`${c.bold}   CLI Balanza / Diagnóstico${c.reset}`);
   log(`${c.bold}${c.red}═════════════════════════════════════════${c.reset}\n`);
 
   log(`  ${c.bold}Diagnóstico${c.reset}`);
@@ -595,7 +595,7 @@ async function main() {
     case "--help":
     case "-h":
       log(`
-${c.bold}FAMEAT CLI - Herramientas de Balanza${c.reset}
+${c.bold}CLI - Herramientas de Balanza${c.reset}
 
 Uso:
   npx tsx src/cli/scale-cli.ts [comando] [opciones]

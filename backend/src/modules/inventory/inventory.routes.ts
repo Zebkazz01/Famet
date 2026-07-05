@@ -2,11 +2,12 @@ import { Router } from "express";
 import { authenticate, authorize } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { createMovementSchema } from "./inventory.schema";
-import { createMovement, getMovements, getAlerts } from "./inventory.controller";
+import { createMovement, getMovements, getMovement, getAlerts } from "./inventory.controller";
 
 const router = Router();
 
 router.get("/movements", authenticate, authorize("ADMIN", "SUPERVISOR"), getMovements);
+router.get("/movements/:id", authenticate, authorize("ADMIN", "SUPERVISOR"), getMovement);
 router.post("/movements", authenticate, authorize("ADMIN", "SUPERVISOR"), validate(createMovementSchema), createMovement);
 router.get("/alerts", authenticate, authorize("ADMIN", "SUPERVISOR"), getAlerts);
 

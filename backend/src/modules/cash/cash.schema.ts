@@ -4,6 +4,7 @@ export const createCashMovementSchema = z.object({
   type: z.enum(["CASH_IN", "CASH_OUT"]),
   amount: z.number().positive("El monto debe ser mayor a 0"),
   reason: z.string().min(1, "El motivo es obligatorio"),
+  source: z.string().optional().default("MANUAL"),
 });
 
 export type CreateCashMovementInput = z.infer<typeof createCashMovementSchema>;

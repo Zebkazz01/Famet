@@ -95,14 +95,27 @@ export class ScaleManager extends EventEmitter {
     }
   }
 
+  private reconnectAttempts = 0;
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
-      log.info("Reconectando balanza...");
+      this.reconnectAttempts++;
+      // Cada 3 intentos fallidos, re-escanear puertos por si la balanza cambio (USB hot-plug)
+      if (this.reconnectAttempts % 3 === 0 && process.env.SCALE_AUTODETECT !== "false") {
+        try {
+          const detected = await ScaleManager.findScalePort();
+          if (detected && detected !== this.portPath) {
+            log.info(`Balanza detectada en nuevo puerto ${detected} (antes ${this.portPath})`);
+            this.portPath = detected;
+          }
+        } catch {}
+      }
+      log.info(`Reconectando balanza en ${this.portPath}...`);
       try {
         await this.connect();
         log.ok("Balanza reconectada");
+        this.reconnectAttempts = 0;
       } catch {
         // Se reprogramará automáticamente
       }
@@ -175,5 +188,40 @@ export class ScaleManager extends EventEmitter {
       vendorId: p.vendorId || "",
       productId: p.productId || "",
     }));
+  }
+
+  /**
+   * Auto-detect puerto balanza. Busca por VID/PID conocidos de chips USB-Serial
+   * comunes en balanzas: CH340/CH341 (WCH), CP210x (Silicon Labs), FTDI, PL2303.
+   * Retorna primer match o null.
+   */
+  static async findScalePort(): Promise<string | null> {
+    const ports = await this.listPorts();
+    // Prioridad: VID conocidos de chips serial usados en balanzas baratas
+    const KNOWN = [
+      { vid: "1A86", pid: ["7523", "5523", "55D4"] }, // WCH CH340/CH341
+      { vid: "10C4", pid: ["EA60", "EA70"] },         // Silicon Labs CP210x
+      { vid: "0403", pid: ["6001", "6010", "6011", "6014"] }, // FTDI
+      { vid: "067B", pid: ["2303", "23A3"] },         // Prolific PL2303
+    ];
+    for (const k of KNOWN) {
+      const match = ports.find((p) =>
+        p.vendorId.toUpperCase() === k.vid &&
+        k.pid.includes(p.productId.toUpperCase()),
+      );
+      if (match) return match.path;
+    }
+    return null;
+  }
+
+  /**
+   * Cambia el puerto a usar. Si conectado, fuerza reconexion.
+   */
+  setPort(path: string): void {
+    this.portPath = path;
+  }
+
+  getPort(): string {
+    return this.portPath;
   }
 }

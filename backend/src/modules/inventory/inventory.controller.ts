@@ -30,6 +30,10 @@ export async function createMovement(req: Request, res: Response) {
       data: { stockQty: newQty },
     });
 
+    // Calcular valor del movimiento basado en costo del producto
+    const unitCost = product.cost ?? null;
+    const totalValue = unitCost ? new Decimal(unitCost).mul(qty) : null;
+
     return tx.inventoryMovement.create({
       data: {
         productId: product.id,
@@ -39,8 +43,10 @@ export async function createMovement(req: Request, res: Response) {
         newQty,
         notes: input.notes || null,
         userId,
-      },
-      include: { product: true },
+        unitCost,
+        totalValue,
+      } as any,
+      include: { product: true, user: { select: { firstName: true, lastName: true } } },
     });
   });
 
@@ -61,11 +67,21 @@ export async function getMovements(req: Request, res: Response) {
 
   const movements = await prisma.inventoryMovement.findMany({
     where,
-    include: { product: true },
+    include: { product: true, user: { select: { firstName: true, lastName: true } } },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
   return res.json(movements);
+}
+
+export async function getMovement(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const movement = await prisma.inventoryMovement.findUnique({
+    where: { id },
+    include: { product: { include: { category: true } }, user: { select: { firstName: true, lastName: true } } },
+  });
+  if (!movement) return res.status(404).json({ error: "Movimiento no encontrado" });
+  return res.json(movement);
 }
 
 export async function getAlerts(_req: Request, res: Response) {

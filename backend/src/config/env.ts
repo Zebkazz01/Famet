@@ -13,7 +13,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
   SCALE_PORT: z.string().default("COM3"),
   SCALE_BAUD_RATE: z.coerce.number().default(9600),
-  BUSINESS_NAME: z.string().default("FAMEAT"),
+  BUSINESS_NAME: z.string().default("POS"),
   BUSINESS_ADDRESS: z.string().default(""),
   BUSINESS_PHONE: z.string().default(""),
 });

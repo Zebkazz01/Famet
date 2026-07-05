@@ -37,6 +37,7 @@ export function printBanner(startTime: number) {
   console.log(`${c.red}${c.bold}  ██║     ██║  ██║██║ ╚═╝ ██║███████╗██║  ██║   ██║   ${c.reset}`);
   console.log(`${c.red}${c.bold}  ╚═╝     ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝   ╚═╝   ${c.reset}`);
   console.log(`${c.dim}  Punto de Venta v1.0.0${c.reset}`);
+  console.log(`  ${c.bold}${c.magenta}[ BACKEND ]${c.reset}`);
   console.log("");
   console.log(`${c.bold}  Servidor listo en ${c.green}${elapsed}ms${c.reset}`);
   console.log("");

@@ -1,7 +1,10 @@
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
+import { createServer as createHttpsServer } from "https";
+import fs from "fs";
 import { Server as SocketServer } from "socket.io";
+import jwt from "jsonwebtoken";
 import { env } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler";
 import { ScaleManager } from "./scale/scaleManager";
@@ -18,12 +21,47 @@ import ticketsRoutes from "./modules/tickets/tickets.routes";
 import inventoryRoutes from "./modules/inventory/inventory.routes";
 import cashRoutes from "./modules/cash/cash.routes";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes";
+import suppliersRoutes from "./modules/suppliers/suppliers.routes";
+import configRoutes, { manifestHandler } from "./modules/config/config.routes";
+import notificationsRoutes from "./modules/notifications/notifications.routes";
+import barcodesRoutes from "./modules/barcodes/barcodes.routes";
+import productBatchRoutes, { expiryGeneralRouter } from "./modules/expiry/expiry.routes";
+import expensesRoutes from "./modules/expenses/expenses.routes";
+import discountRoutes, { productDiscountRulesRouter } from "./modules/discounts/discounts.routes";
+import reportsRoutes from "./modules/reports/reports.routes";
+import preferencesRoutes from "./modules/preferences/preferences.routes";
+import animalPartsRoutes from "./modules/animalParts/animalParts.routes";
+import customersRoutes from "./modules/customers/customers.routes";
+import purchaseOrdersRoutes from "./modules/purchaseOrders/purchaseOrders.routes";
 import { authenticate, authorize } from "./middleware/auth";
+import { setIO } from "./realtime/socketRegistry";
+import * as cronManager from "./jobs/cronManager";
+import * as configCache from "./utils/configCache";
+import { registerLowStockJob } from "./jobs/lowStockCheckJob";
+import { registerNotificationCleanupJob } from "./jobs/notificationCleanupJob";
+import { registerExpiryCheckJob } from "./jobs/expiryCheckJob";
+import { registerBackupJob, runBackup, restoreBackup, listBackups } from "./jobs/backupJob";
+import { uploadsDir as resolveUploadsDir, backupsDir } from "./utils/paths";
 
 const startTime = Date.now();
 
 const app = express();
-const httpServer = createServer(app);
+
+// HTTPS opcional: si HTTPS=true y existen cert.pem + key.pem (en frontend/ por defecto),
+// arranca con TLS. Útil para PWA + cámara desde LAN. Default: HTTP.
+const path = require("path");
+const httpsEnabled = process.env.HTTPS === "true";
+const certPath = process.env.SSL_CERT || path.join(__dirname, "..", "..", "frontend", "cert.pem");
+const keyPath = process.env.SSL_KEY || path.join(__dirname, "..", "..", "frontend", "key.pem");
+
+const httpServer = httpsEnabled && fs.existsSync(certPath) && fs.existsSync(keyPath)
+  ? createHttpsServer({ cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) }, app)
+  : createServer(app);
+
+if (httpsEnabled && !(fs.existsSync(certPath) && fs.existsSync(keyPath))) {
+  log.warn(`[server] HTTPS=true pero no se encontraron certs en ${certPath}. Arrancando con HTTP.`);
+}
+
 const io = new SocketServer(httpServer, {
   cors: { origin: "*" },
 });
@@ -44,6 +82,27 @@ app.use((req, res, next) => {
   next();
 });
 
+// Health check (público, sin auth) - usado por diagnóstico del frontend
+app.get("/api/health", async (_req, res) => {
+  let dbOk = false;
+  let initialized = false;
+  try {
+    const { prisma } = await import("./config/database");
+    await prisma.$queryRaw`SELECT 1`;
+    dbOk = true;
+    const userCount = await prisma.user.count();
+    initialized = userCount > 0;
+  } catch {}
+
+  res.json({
+    status: "ok",
+    database: dbOk,
+    initialized,
+    scale: scaleManager.connected,
+    uptime: Math.floor(process.uptime()),
+  });
+});
+
 // Rutas API
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
@@ -54,6 +113,24 @@ app.use("/api/sales", ticketsRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/cash", cashRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/suppliers", suppliersRoutes);
+app.use("/api/config", configRoutes);
+app.use("/api/notifications", notificationsRoutes);
+app.use("/api/barcodes", barcodesRoutes);
+app.use("/api/products", productBatchRoutes);
+app.use("/api/products", productDiscountRulesRouter);
+app.use("/api", expiryGeneralRouter);
+app.use("/api/expenses", expensesRoutes);
+app.use("/api/discount-rules", discountRoutes);
+app.use("/api/reports", reportsRoutes);
+app.use("/api/preferences", preferencesRoutes);
+app.use("/api/animal-parts", animalPartsRoutes);
+app.use("/api/customers", customersRoutes);
+app.use("/api/purchase-orders", purchaseOrdersRoutes);
+app.get("/api/manifest.json", manifestHandler);
+
+// Servir imágenes (logo, productos, gastos). Path absoluto independiente del cwd.
+app.use("/uploads", express.static(resolveUploadsDir()));
 
 // Rutas de la balanza (REST)
 const scaleManager = new ScaleManager(env.SCALE_PORT, env.SCALE_BAUD_RATE);
@@ -68,6 +145,11 @@ app.post("/api/scale/connect", authenticate, authorize("ADMIN"), async (req, res
   if (port) scaleManager.updateConfig(port, baudRate || env.SCALE_BAUD_RATE);
   try {
     await scaleManager.connect();
+    // Persistir puerto + baud en BD para sobrevivir reinicios
+    try {
+      if (port) await configCache.set("scale_port", port);
+      if (baudRate) await configCache.set("scale_baud_rate", String(baudRate));
+    } catch {}
     res.json({ message: "Conectado a la balanza", connected: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message, connected: false });
@@ -77,6 +159,39 @@ app.post("/api/scale/connect", authenticate, authorize("ADMIN"), async (req, res
 app.post("/api/scale/disconnect", authenticate, authorize("ADMIN"), async (_req, res) => {
   await scaleManager.disconnect();
   res.json({ message: "Desconectado", connected: false });
+});
+
+/**
+ * Auto-detecta puerto y reconecta. Sirve para hot-plug: usuario desconecto
+ * la balanza y la conecto en otro puerto USB.
+ */
+app.post("/api/scale/reconnect", authenticate, async (_req, res) => {
+  try {
+    await scaleManager.disconnect();
+  } catch {}
+  let detected: string | null = null;
+  try {
+    detected = await ScaleManager.findScalePort();
+  } catch {}
+  const targetPort = detected || env.SCALE_PORT;
+  scaleManager.setPort(targetPort);
+  try {
+    await scaleManager.connect();
+    res.json({
+      message: `Reconectada en ${targetPort}`,
+      connected: true,
+      port: targetPort,
+      autoDetected: !!detected,
+    });
+  } catch (err: any) {
+    const ports = await ScaleManager.listPorts().catch(() => []);
+    res.status(500).json({
+      error: err.message || "No se pudo reconectar",
+      connected: false,
+      port: targetPort,
+      availablePorts: ports,
+    });
+  }
 });
 
 app.get("/api/scale/status", authenticate, (_req, res) => {
@@ -124,7 +239,7 @@ app.get("/api/scale/processor", authenticate, (_req, res) => {
   res.json(scaleManager.getProcessorConfig());
 });
 
-app.put("/api/scale/processor", authenticate, authorize("ADMIN"), (req, res) => {
+app.put("/api/scale/processor", authenticate, authorize("ADMIN"), async (req, res) => {
   const { inputUnit, unit, minWeight, stabilityCount, stabilityTolerance, averageSamples } = req.body;
   const updates: any = {};
   if (inputUnit && ["kg", "lb", "g"].includes(inputUnit)) updates.inputUnit = inputUnit;
@@ -134,6 +249,12 @@ app.put("/api/scale/processor", authenticate, authorize("ADMIN"), (req, res) => 
   if (stabilityTolerance !== undefined) updates.stabilityTolerance = Number(stabilityTolerance);
   if (averageSamples !== undefined) updates.averageSamples = Number(averageSamples);
   scaleManager.updateProcessorConfig(updates);
+  // Persistir en BD para sobrevivir reinicios/desconexiones
+  try {
+    await configCache.set("scale_processor_config", JSON.stringify(scaleManager.getProcessorConfig()));
+  } catch (e: any) {
+    log.warn(`[scale] no se pudo guardar config en BD: ${e.message}`);
+  }
   res.json({ message: "Procesador actualizado", config: scaleManager.getProcessorConfig() });
 });
 
@@ -143,27 +264,56 @@ app.post("/api/scale/reset", authenticate, (_req, res) => {
   res.json({ message: "Procesador reseteado" });
 });
 
-// Ruta de configuración del sistema
-app.get("/api/config", authenticate, async (_req, res) => {
-  const { prisma } = await import("./config/database");
-  const configs = await prisma.systemConfig.findMany();
-  const configMap: Record<string, string> = {};
-  for (const c of configs) configMap[c.key] = c.value;
-  res.json(configMap);
+// === Backups ===
+app.post("/api/backup/run", authenticate, authorize("ADMIN"), async (_req, res) => {
+  try {
+    const result = await runBackup();
+    res.json({ message: "Backup completado", ...result });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || "Error en backup" });
+  }
 });
 
-app.put("/api/config", authenticate, authorize("ADMIN"), async (req, res) => {
-  const { prisma } = await import("./config/database");
-  const entries = Object.entries(req.body) as [string, string][];
-  for (const [key, value] of entries) {
-    await prisma.systemConfig.upsert({
-      where: { key },
-      update: { value: String(value) },
-      create: { key, value: String(value) },
-    });
-  }
-  res.json({ message: "Configuración actualizada" });
+app.get("/api/backup/list", authenticate, authorize("ADMIN"), (_req, res) => {
+  res.json(listBackups());
 });
+
+/**
+ * PELIGROSO: restaura un backup sobre la BD actual.
+ * Genera un backup de seguridad automáticamente antes.
+ * Body: { fileName: string, dropFirst?: boolean }
+ */
+app.post("/api/backup/restore", authenticate, authorize("ADMIN"), async (req, res) => {
+  const fileName = String(req.body?.fileName || "").trim();
+  const dropFirst = !!req.body?.dropFirst;
+  if (!fileName) return res.status(400).json({ error: "fileName requerido" });
+  if (fileName.includes("..") || fileName.includes("/") || fileName.includes("\\")) {
+    return res.status(400).json({ error: "fileName inválido" });
+  }
+  try {
+    const result = await restoreBackup(fileName, { dropFirst });
+    res.json({ message: "Restauración completada", ...result });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || "Error en restore" });
+  }
+});
+
+// Servir frontend estático en producción (single-process deploy)
+// Setear FRONTEND_DIST=ruta/al/build (default: ../frontend/dist)
+if (process.env.SERVE_FRONTEND !== "false") {
+  const path = require("path");
+  const fs = require("fs");
+  const frontendDist = path.resolve(
+    process.env.FRONTEND_DIST || path.join(__dirname, "..", "..", "frontend", "dist"),
+  );
+  if (fs.existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+    app.get(/^\/(?!api|uploads|socket\.io).*/, (_req, res) => {
+      res.sendFile(path.join(frontendDist, "index.html"));
+    });
+    log.info(`[server] sirviendo frontend desde ${frontendDist}`);
+  }
+}
 
 // Error handler
 app.use(errorHandler);
@@ -171,9 +321,27 @@ app.use(errorHandler);
 // Socket.IO para balanza
 setupScaleSocket(io, scaleManager);
 
+// Registrar io global para emisiones cross-módulo
+setIO(io);
+
+// Auth opcional en sockets para asignar rooms user:{id} y role:{role}
+io.on("connection", (socket) => {
+  const token = (socket.handshake.auth?.token || socket.handshake.query?.token) as string | undefined;
+  if (!token) return;
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET) as { userId: number; role: string };
+    socket.join(`user:${payload.userId}`);
+    if (payload.role) socket.join(`role:${payload.role}`);
+  } catch {
+    // Token inválido — socket sin rooms, solo recibe broadcasts
+  }
+});
+
 // Iniciar servidor
 httpServer.listen(env.PORT, async () => {
   printBanner(startTime);
+  const proto = httpsEnabled && fs.existsSync(certPath) && fs.existsSync(keyPath) ? "https" : "http";
+  log.info(`[server] escuchando en ${proto}://0.0.0.0:${env.PORT}`);
   printRoutes();
 
   // Verificar conexión a base de datos
@@ -182,13 +350,60 @@ httpServer.listen(env.PORT, async () => {
     const { prisma } = await import("./config/database");
     await prisma.$queryRaw`SELECT 1`;
     printDbStatus(true, Date.now() - dbStart);
+    // Precargar config cache
+    try { await configCache.ensureLoaded(); } catch {}
+    // Restaurar config persistida de la balanza (sobrevive reinicios y desconexiones)
+    try {
+      const saved = configCache.get("scale_processor_config");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        scaleManager.updateProcessorConfig(parsed);
+        log.info("[scale] config procesador restaurada desde BD");
+      }
+    } catch (e: any) {
+      log.warn(`[scale] no se pudo restaurar config procesador: ${e.message}`);
+    }
+    // Registrar y arrancar cron jobs
+    registerLowStockJob();
+    registerNotificationCleanupJob();
+    registerExpiryCheckJob();
+    registerBackupJob();
+    cronManager.start();
   } catch (e: any) {
     printDbStatus(false, Date.now() - dbStart);
     log.error(e.message);
   }
 
-  // Intentar conectar balanza
-  log.info(`Conectando balanza en ${env.SCALE_PORT}...`);
+  // Auto-detectar puerto balanza por VID/PID conocidos.
+  // Prioridad: 1) BD (scale_port), 2) auto-detect, 3) env.SCALE_PORT
+  const savedPort = configCache.get("scale_port");
+  let scalePath = savedPort || env.SCALE_PORT;
+  if (savedPort) log.info(`[scale] puerto cargado de BD: ${savedPort}`);
+  const savedBaud = configCache.get("scale_baud_rate");
+  const baudFinal = savedBaud ? Number(savedBaud) : env.SCALE_BAUD_RATE;
+  if (savedPort || savedBaud) {
+    scaleManager.updateConfig(scalePath, baudFinal);
+  }
+  const auto = process.env.SCALE_AUTODETECT !== "false" && !savedPort;
+  if (auto) {
+    try {
+      const detected = await ScaleManager.findScalePort();
+      if (detected) {
+        if (detected !== env.SCALE_PORT) {
+          log.info(`[scale] auto-detectada en ${detected} (env decia ${env.SCALE_PORT})`);
+        } else {
+          log.info(`[scale] auto-detectada en ${detected}`);
+        }
+        scalePath = detected;
+        scaleManager.setPort(scalePath);
+      } else {
+        log.warn(`[scale] no se detecto balanza por VID/PID, usando puerto de env: ${env.SCALE_PORT}`);
+      }
+    } catch (e: any) {
+      log.warn(`[scale] auto-detect fallo: ${e.message}`);
+    }
+  }
+  log.info(`Conectando balanza en ${scalePath}...`);
   scaleManager.connect()
     .then(() => printScaleStatus(true))
     .catch((err) => printScaleStatus(false, err.message));
@@ -197,6 +412,7 @@ httpServer.listen(env.PORT, async () => {
 // Graceful shutdown
 process.on("SIGINT", () => {
   printShutdown();
+  cronManager.stop();
   scaleManager.disconnect().then(() => {
     log.ok("Balanza desconectada");
     httpServer.close(() => {
@@ -208,5 +424,6 @@ process.on("SIGINT", () => {
 
 process.on("SIGTERM", () => {
   printShutdown();
+  cronManager.stop();
   process.exit(0);
 });
