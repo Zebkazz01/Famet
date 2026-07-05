@@ -1,28 +1,41 @@
 import { useState } from 'react';
 import { useScale } from '../contexts/ScaleContext';
+import { useConfig } from '../contexts/ConfigContext';
+import { Portal } from './Portal';
+import toast from 'react-hot-toast';
 
 export function ScaleConnectionModal() {
-  const { status, disabled, disableScale } = useScale();
+  const { status, disabled, disableScale, reconnect, reconnecting } = useScale();
+  const { config } = useConfig();
   const [showConfirm, setShowConfirm] = useState(false);
+
+  async function handleReconnect() {
+    const r = await reconnect();
+    if (r.ok) {
+      toast.success(`Balanza reconectada${r.port ? ` en ${r.port}` : ''}`);
+    } else {
+      toast.error(r.error || 'No se pudo reconectar');
+    }
+  }
 
   // No mostrar si ya conectó, si está deshabilitada, o si ya pasó el flujo
   if (status === 'connected' || disabled) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <Portal><div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         {!showConfirm ? (
           <>
             {/* Header */}
-            <div className="bg-red-600 px-6 py-4">
-              <h2 className="text-white text-lg font-bold text-center">FAMEAT POS</h2>
+            <div className="bg-red-500 px-6 py-4">
+              <h2 className="text-white text-lg font-bold text-center">{config.businessName}</h2>
             </div>
 
             <div className="p-6 text-center">
               {/* Animación de la balanza */}
               <div className="mb-6">
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-50 mb-4">
-                  <svg className="w-10 h-10 text-red-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="w-10 h-10 text-red-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1.5M12 19.5V21M3 12h1.5M19.5 12H21M5.636 5.636l1.06 1.06M17.303 17.303l1.06 1.06M5.636 18.364l1.06-1.06M17.303 6.697l1.06-1.06" />
                     <circle cx="12" cy="12" r="4" />
                   </svg>
@@ -52,13 +65,40 @@ export function ScaleConnectionModal() {
                 </p>
               </div>
 
-              {/* Botón cancelar */}
-              <button
-                onClick={() => setShowConfirm(true)}
-                className="text-gray-400 hover:text-gray-600 text-sm underline underline-offset-2 transition-colors"
-              >
-                Cancelar conexión
-              </button>
+              {/* Acciones */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleReconnect}
+                  disabled={reconnecting}
+                  className="w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 transition-colors inline-flex items-center justify-center gap-2"
+                >
+                  {reconnecting ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                        <path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Reconectando...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                      </svg>
+                      Re-detectar puerto y reconectar
+                    </>
+                  )}
+                </button>
+                <p className="text-[10px] text-gray-400">
+                  Util si desconectaste la balanza y la volviste a conectar en otro puerto USB
+                </p>
+                <button
+                  onClick={() => setShowConfirm(true)}
+                  className="text-gray-400 hover:text-gray-600 text-sm underline underline-offset-2 transition-colors mt-2"
+                >
+                  Cancelar conexión
+                </button>
+              </div>
             </div>
           </>
         ) : (
@@ -95,7 +135,7 @@ export function ScaleConnectionModal() {
                 </button>
                 <button
                   onClick={disableScale}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium transition-colors"
                 >
                   Sí, continuar sin balanza
                 </button>
@@ -104,6 +144,6 @@ export function ScaleConnectionModal() {
           </>
         )}
       </div>
-    </div>
+    </div></Portal>
   );
 }

@@ -21,6 +21,6 @@ export const MOVEMENT_TYPES = {
   ENTRY: { key: 'ENTRY', label: 'Entrada', color: 'text-green-600' },
   SALE: { key: 'SALE', label: 'Venta', color: 'text-blue-600' },
   ADJUSTMENT: { key: 'ADJUSTMENT', label: 'Ajuste', color: 'text-yellow-600' },
-  LOSS: { key: 'LOSS', label: 'Merma', color: 'text-red-600' },
+  LOSS: { key: 'LOSS', label: 'Merma', color: 'text-red-500' },
   RETURN: { key: 'RETURN', label: 'Devolución', color: 'text-purple-600' },
 } as const;

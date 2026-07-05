@@ -1,6 +1,9 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSystemDiagnostic } from '../hooks/useSystemDiagnostic';
+import { useConfig } from '../contexts/ConfigContext';
+import { GlobalFooter } from '../components/layout/GlobalFooter';
 
 export function LoginPage() {
   const [username, setUsername] = useState('');
@@ -9,6 +12,14 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  useSystemDiagnostic();
+  const { config } = useConfig();
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(''), 3000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -25,16 +36,17 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-sm">
+    <div className="flex-1 flex items-center justify-center bg-gray-900">
+      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-sm">
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-red-600">FAMEAT</h1>
+          <img src={config.businessLogo || '/pwa/icons/icon-any-96.png'} alt={config.businessName} className="w-16 h-16 mx-auto mb-3 rounded-xl object-cover" />
+          <h1 className="text-3xl font-bold text-red-500">{config.businessName}</h1>
           <p className="text-gray-500 text-sm">Punto de Venta</p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form id="login-form" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4">
+            <div className="bg-red-50 text-red-500 text-sm p-3 rounded-lg mb-4 animate-pulse">
               {error}
             </div>
           )}
@@ -45,7 +57,7 @@ export function LoginPage() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
               placeholder="admin"
               autoFocus
             />
@@ -57,7 +69,7 @@ export function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
               placeholder="••••••"
             />
           </div>
@@ -65,7 +77,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors font-medium"
+            className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors font-medium"
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
@@ -75,6 +87,7 @@ export function LoginPage() {
           admin / admin123 | supervisor1 / super123 | cajero1 / cajero123
         </p>
       </div>
+      <GlobalFooter />
     </div>
   );
 }

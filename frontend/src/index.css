@@ -1,12 +1,363 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-primary: #dc2626;
-  --color-primary-dark: #b91c1c;
+  --color-primary: #ef4444;
+  --color-primary-dark: #dc2626;
   --color-primary-light: #fecaca;
+  --font-sans: 'Montserrat', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Fuente global por defecto */
+html, body {
+  font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+/* Transición suave entre rutas (fade-in con leve translateY) */
+@keyframes page-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-transition {
+  animation: page-fade-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-transition { animation: none; }
+}
+
+/* Shimmer animation para skeletons */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-pulse {
+  background: linear-gradient(
+    90deg,
+    rgba(229, 231, 235, 0.6) 0%,
+    rgba(229, 231, 235, 1) 50%,
+    rgba(229, 231, 235, 0.6) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.dark .skeleton-pulse {
+  background: linear-gradient(
+    90deg,
+    rgba(51, 65, 85, 0.6) 0%,
+    rgba(71, 85, 105, 1) 50%,
+    rgba(51, 65, 85, 0.6) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Tailwind v4 cambió el color default de border a currentColor (casi negro).
+ * Restauramos comportamiento v3: gris sutil en light, gris oscuro en dark. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: #e5e7eb; /* gray-200 */
+  }
+  .dark *,
+  .dark ::after,
+  .dark ::before,
+  .dark ::backdrop,
+  .dark ::file-selector-button {
+    border-color: #374151; /* gray-700 */
+  }
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+}
+
+/* View Transition para cambio de tema */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+/* Scroll estilizado */
+.styled-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.styled-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.styled-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.styled-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.dark .styled-scroll::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+.dark .styled-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+/* Firefox */
+.styled-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.dark .styled-scroll {
+  scrollbar-color: #475569 transparent;
+}
+
+/* Evitar compresion visual de botones en movil al tocar */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ===== DARK MODE ===== */
+
+/* Base: body & root */
+.dark {
+  color-scheme: dark;
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+/* Surfaces */
+.dark .bg-white {
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+}
+
+.dark .bg-gray-50,
+.dark .bg-gray-50\/80 {
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+}
+
+.dark .bg-gray-100 {
+  background-color: #334155 !important;
+  color: #e2e8f0;
+}
+
+.dark .bg-gray-200 {
+  background-color: #475569 !important;
+  color: #e2e8f0;
+}
+
+.dark .bg-gray-900 {
+  background-color: #0f172a !important;
+}
+
+/* Page background override */
+.dark .bg-gray-100.dark\:bg-slate-900 {
+  background-color: #0f172a !important;
+}
+
+/* Text */
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+.dark .text-gray-400 {
+  color: #64748b !important;
+}
+
+/* Borders */
+.dark .border,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: #334155 !important;
+}
+
+.dark .border-b,
+.dark .border-t,
+.dark .border-l,
+.dark .border-r {
+  border-color: #334155 !important;
+}
+
+.dark .divide-gray-100 > * + * {
+  border-color: #334155 !important;
+}
+
+/* Shadows */
+.dark .shadow,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl,
+.dark .shadow-2xl {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Form inputs */
+.dark input[type="text"],
+.dark input[type="date"],
+.dark input[type="number"],
+.dark input[type="password"],
+.dark input[type="search"],
+.dark input[type="email"],
+.dark input[type="tel"],
+.dark input[type="file"],
+.dark select,
+.dark textarea {
+  background-color: #0f172a !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+.dark select option {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+/* Modals */
+.dark .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Rounded cards & panels inside modals */
+.dark .rounded-xl.shadow-2xl,
+.dark .rounded-lg.shadow {
+  background-color: #1e293b !important;
+}
+
+/* Accent backgrounds (keep their color but darken) */
+.dark .bg-red-50 { background-color: #3b1620 !important; }
+.dark .bg-red-100 { background-color: #4c1d2a !important; }
+.dark .bg-blue-50 { background-color: #172554 !important; }
+.dark .bg-blue-100 { background-color: #1e3a5f !important; }
+.dark .bg-green-50 { background-color: #14352a !important; }
+.dark .bg-green-100 { background-color: #1a4731 !important; }
+.dark .bg-amber-50 { background-color: #2a1f0a !important; }
+.dark .bg-amber-100 { background-color: #3d2e0f !important; }
+.dark .bg-purple-100 { background-color: #2e1f5e !important; }
+.dark .bg-orange-100 { background-color: #3d220a !important; }
+.dark .bg-yellow-100 { background-color: #3d3213 !important; }
+
+.dark .bg-green-900\/30 { background-color: rgba(20, 83, 45, 0.4) !important; }
+.dark .bg-red-900\/30 { background-color: rgba(127, 29, 29, 0.4) !important; }
+
+/* Header stays red */
+.dark header[style*="background-color"] {
+  /* header keeps its red color */
+}
+
+/* Sidebar stays dark */
+.dark aside.bg-gray-900 {
+  background-color: #0f172a !important;
+}
+
+/* Buttons - hover states */
+.dark .hover\:bg-gray-50:hover { background-color: #334155 !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #3b4d66 !important; }
+.dark .hover\:bg-gray-200:hover { background-color: #475569 !important; }
+.dark .hover\:bg-gray-300:hover { background-color: #64748b !important; }
+
+/* Badges that use white text already look fine */
+/* Login page - dark bg stays */
+.dark .bg-gray-900 .bg-white {
+  background-color: #1e293b !important;
+}
+
+/* Toast overrides */
+.dark .react-hot-toast {
+  --toast-bg: #1e293b;
+}
+
+/* Scrollbar */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+/* Thin stylized scrollbar for sidebar and compact areas */
+.thin-scroll::-webkit-scrollbar { width: 3px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 99px;
+}
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.65);
+}
+.dark .thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.45);
+}
+.dark .thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.75);
+}
+
+/* driver.js tour dark mode */
+.dark .driver-popover {
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+  border-color: #334155 !important;
+}
+.dark .driver-popover .driver-popover-title { color: #f1f5f9; }
+.dark .driver-popover .driver-popover-description { color: #cbd5e1; }
+
+/* Tour popover custom styles */
+.fameat-tour-popover { max-width: 320px; }
+.fameat-tour-popover .driver-popover-title { font-size: 16px; font-weight: 700; }
+.fameat-tour-popover .driver-popover-description { font-size: 13px; line-height: 1.5; }
+
+/* ===== MODAL FORM STYLES ===== */
+.modal-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.modal-form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* Acciones de tabla: ocultar texto de botones en movil, solo iconos */
+@media (max-width: 767px) {
+  table button > span:not(:has(svg)),
+  table a > span:not(:has(svg)) {
+    display: none;
+  }
+  table td .flex.gap-2 button,
+  table td .flex.gap-2 a {
+    font-size: 0;
+    padding: 6px;
+    gap: 0;
+  }
+  table td .flex.gap-2 button svg,
+  table td .flex.gap-2 a svg {
+    font-size: initial;
+  }
 }

@@ -3,6 +3,16 @@ import client from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 import toast from 'react-hot-toast';
+import { CurrencyDollar, Plus, Vault, X, ArrowDown, ArrowUp, Wallet, Funnel, SortAscending } from '@phosphor-icons/react';
+import { Portal } from '../components/Portal';
+import { CurrencyInput } from '../components/CurrencyInput';
+import { StatsCards } from '../components/StatsCards';
+import { PageSkeleton } from '../components/PageSkeleton';
+import { ErrorView } from '../components/ErrorBoundary';
+import { ViewToggle } from '../components/ViewToggle';
+import { FilterPanel, DatePicker, Select } from '../components/ui';
+import { useTableFilters } from '../hooks/useTableFilters';
+import { PageHeader } from '../components/layout/PageHeader';
 
 interface CashMovement {
   id: number;
@@ -28,43 +38,72 @@ export function CashPage() {
   const canCreateMovement = hasRole('ADMIN', 'VENDEDOR');
   const canCreateClosing = hasRole('ADMIN', 'SUPERVISOR');
 
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<Error | null>(null);
   const [tab, setTab] = useState<'movements' | 'closings'>(canCreateMovement ? 'movements' : 'closings');
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [closings, setClosings] = useState<CashClosing[]>([]);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
 
   // Form states
   const [showMovForm, setShowMovForm] = useState(false);
   const [movType, setMovType] = useState<'CASH_IN' | 'CASH_OUT'>('CASH_IN');
   const [movAmount, setMovAmount] = useState('');
   const [movReason, setMovReason] = useState('');
+  const [movSource, setMovSource] = useState('MANUAL');
+
+  const [showOpeningForm, setShowOpeningForm] = useState(false);
+  const [openingAmount, setOpeningAmount] = useState('');
 
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [expectedAmount, setExpectedAmount] = useState('');
   const [actualAmount, setActualAmount] = useState('');
   const [closeNotes, setCloseNotes] = useState('');
 
-  const loadMovements = () => {
-    client.get(`/cash/movements?date=${date}`).then((r) => setMovements(r.data));
-  };
+  const { filters: cFilters, setFilter: setCFilter, clear: clearCFilters, activeCount: cActiveCount } = useTableFilters<{ type: string; sort: string }>({ type: '', sort: 'recent' });
 
-  const loadClosings = () => {
-    client.get(`/cash/closings?from=${date}&to=${date}`).then((r) => setClosings(r.data)).catch(() => {});
-  };
+  const loadMovements = () =>
+    client.get(`/cash/movements?date=${date}`)
+      .then((r) => setMovements(r.data))
+      .catch((err) => { toast.error(err.response?.data?.error || 'Error al cargar movimientos'); });
+
+  const loadClosings = () =>
+    client.get(`/cash/closings?from=${date}&to=${date}`)
+      .then((r) => setClosings(r.data))
+      .catch(() => {});
 
   useEffect(() => {
-    loadMovements();
-    if (canCreateClosing) loadClosings();
+    Promise.all([
+      loadMovements(),
+      canCreateClosing ? loadClosings() : Promise.resolve(),
+    ]).catch((err) => setLoadError(err)).finally(() => setLoading(false));
   }, [date]);
 
   const submitMovement = async () => {
     if (!movAmount || !movReason) return toast.error('Completa todos los campos');
     try {
-      await client.post('/cash/movement', { type: movType, amount: parseFloat(movAmount), reason: movReason });
+      await client.post('/cash/movement', { type: movType, amount: parseFloat(movAmount), reason: movReason, source: movSource });
       toast.success('Movimiento registrado');
       setShowMovForm(false);
       setMovAmount('');
       setMovReason('');
+      setMovSource('MANUAL');
+      loadMovements();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error');
+    }
+  };
+
+  const submitOpening = async () => {
+    if (!openingAmount) return toast.error('Ingresa el monto de apertura');
+    try {
+      await client.post('/cash/movement', { type: 'CASH_IN', amount: parseFloat(openingAmount), reason: 'Fondo de apertura', source: 'OPENING' });
+      toast.success('Fondo de apertura registrado');
+      setShowOpeningForm(false);
+      setOpeningAmount('');
       loadMovements();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Error');
@@ -92,19 +131,53 @@ export function CashPage() {
 
   const difference = expectedAmount && actualAmount ? parseFloat(actualAmount) - parseFloat(expectedAmount) : 0;
 
+  if (loading) return <PageSkeleton type="table" />;
+  if (loadError) return <ErrorView error={loadError} onRetry={() => window.location.reload()} />;
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Caja</h1>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="px-3 py-2 border rounded-md" />
+    <div className="p-3 md:p-6">
+      <PageHeader
+        icon={<CurrencyDollar size={24} weight="duotone" />}
+        title="Caja"
+        description="Controla el efectivo del negocio: registra entradas (fondos, depósitos) y salidas (pagos, retiros). Realiza cierres de caja al final del turno comparando lo esperado con lo real para detectar diferencias."
+      />
+
+      <StatsCards cards={(() => {
+        const inTotal = movements.filter(m => m.type === 'CASH_IN').reduce((s, m) => s + parseFloat(m.amount), 0);
+        const outTotal = movements.filter(m => m.type === 'CASH_OUT').reduce((s, m) => s + parseFloat(m.amount), 0);
+        return [
+          { label: 'Movimientos', value: movements.length, icon: <Wallet size={20} weight="duotone" />, color: 'bg-blue-100 text-blue-600' },
+          { label: 'Entradas', value: formatCurrency(inTotal), icon: <ArrowDown size={20} weight="bold" />, color: 'bg-green-100 text-green-600' },
+          { label: 'Salidas', value: formatCurrency(outTotal), icon: <ArrowUp size={20} weight="bold" />, color: 'bg-red-100 text-red-500' },
+          { label: 'Balance', value: formatCurrency(inTotal - outTotal), icon: <CurrencyDollar size={20} weight="duotone" />, color: inTotal - outTotal >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500' },
+        ];
+      })()} />
+
+      <div className="mb-4">
+        <FilterPanel storageKey="cash"
+          activeCount={cActiveCount + (date !== (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })() ? 1 : 0)}
+          onClear={() => { clearCFilters(); const d = new Date(); setDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }}
+          chips={cFilters.type ? [{ key: 't', label: cFilters.type === 'CASH_IN' ? 'Entradas' : 'Salidas', onRemove: () => setCFilter('type', '') }] : []}
+        >
+          <DatePicker label="Fecha" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Select label="Tipo" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona tipo" options={[
+            { value: '', label: 'Todos' }, { value: 'CASH_IN', label: 'Entradas' }, { value: 'CASH_OUT', label: 'Salidas' },
+          ]} value={cFilters.type} onChange={(e) => setCFilter('type', e.target.value)} />
+          <Select label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
+            { value: 'recent', label: 'Más reciente' },
+            { value: 'oldest', label: 'Más antiguo' },
+            { value: 'amountDesc', label: 'Monto mayor a menor' },
+            { value: 'amountAsc', label: 'Monto menor a mayor' },
+          ]} value={cFilters.sort} onChange={(e) => setCFilter('sort', e.target.value)} />
+        </FilterPanel>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div id="cash-tabs" className="flex gap-2 mb-4">
         {canCreateMovement && (
           <button
             onClick={() => setTab('movements')}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${tab === 'movements' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'movements' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'}`}
           >
             Movimientos
           </button>
@@ -112,7 +185,7 @@ export function CashPage() {
         {canCreateClosing && (
           <button
             onClick={() => setTab('closings')}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${tab === 'closings' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'closings' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'}`}
           >
             Cierres de Caja
           </button>
@@ -123,43 +196,59 @@ export function CashPage() {
       {tab === 'movements' && (
         <div>
           {canCreateMovement && (
-            <button onClick={() => setShowMovForm(true)} className="mb-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm">
-              + Nuevo Movimiento
-            </button>
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                id="cash-opening-btn"
+                onClick={() => setShowOpeningForm(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-medium shadow-sm"
+              >
+                <Wallet size={16} weight="duotone" /> Fondo de Apertura
+              </button>
+              <button id="cash-new-btn" onClick={() => { setMovSource('MANUAL'); setShowMovForm(true); }} className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                <Plus size={16} weight="bold" /> Nuevo Movimiento
+              </button>
+            </div>
           )}
 
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left p-3">Hora</th>
-                  <th className="text-left p-3">Tipo</th>
-                  <th className="text-right p-3">Monto</th>
-                  <th className="text-left p-3">Motivo</th>
-                  <th className="text-left p-3">Usuario</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movements.map((m) => (
-                  <tr key={m.id} className="border-t">
-                    <td className="p-3">{formatDateTime(m.createdAt)}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${m.type === 'CASH_IN' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {m.type === 'CASH_IN' ? 'Entrada' : 'Salida'}
-                      </span>
-                    </td>
-                    <td className={`p-3 text-right font-bold ${m.type === 'CASH_IN' ? 'text-green-600' : 'text-red-600'}`}>
-                      {m.type === 'CASH_IN' ? '+' : '-'}{formatCurrency(m.amount)}
-                    </td>
-                    <td className="p-3">{m.reason}</td>
-                    <td className="p-3">{m.user.firstName} {m.user.lastName}</td>
-                  </tr>
-                ))}
-                {movements.length === 0 && (
-                  <tr><td colSpan={5} className="p-4 text-center text-gray-400">Sin movimientos</td></tr>
-                )}
-              </tbody>
-            </table>
+          <div id="cash-list" className="bg-white rounded-xl shadow p-4">
+            <ViewToggle storageKey="cash"
+              data={movements.filter((m) => !cFilters.type || m.type === cFilters.type).sort((a, b) => {
+                const s = cFilters.sort || 'recent';
+                if (s === 'recent') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                if (s === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                if (s === 'amountDesc') return parseFloat(b.amount) - parseFloat(a.amount);
+                if (s === 'amountAsc') return parseFloat(a.amount) - parseFloat(b.amount);
+                return 0;
+              })}
+              keyField="id"
+              searchFilter={(m, q) => m.reason.toLowerCase().includes(q) || `${m.user.firstName} ${m.user.lastName}`.toLowerCase().includes(q)}
+              searchPlaceholder="Buscar por motivo o usuario..."
+              cardTitle={(m) => m.reason}
+              cardSubtitle={(m) => formatDateTime(m.createdAt)}
+              cardBadge={(m) => (
+                <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${m.type === 'CASH_IN' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {m.type === 'CASH_IN' ? 'Entrada' : 'Salida'}
+                </span>
+              )}
+              columns={[
+                { key: 'date', label: 'Hora', render: (m) => formatDateTime(m.createdAt), cardHidden: true },
+                { key: 'type', label: 'Tipo', render: (m) => (
+                  <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${m.type === 'CASH_IN' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {m.type === 'CASH_IN' ? 'Entrada' : 'Salida'}
+                  </span>
+                ), cardHidden: true },
+                { key: 'amount', label: 'Monto', render: (m) => (
+                  <span className={`font-bold ${m.type === 'CASH_IN' ? 'text-green-600' : 'text-red-500'}`}>
+                    {m.type === 'CASH_IN' ? '+' : '-'}{formatCurrency(m.amount)}
+                  </span>
+                )},
+                { key: 'reason', label: 'Motivo', render: (m) => m.reason, cardHidden: true },
+                { key: 'user', label: 'Usuario', render: (m) => `${m.user.firstName} ${m.user.lastName}` },
+              ]}
+              emptyMessage="Sin movimientos de caja"
+              onCreateNew={() => setShowMovForm(true)}
+              createNewLabel="Nuevo movimiento"
+            />
           </div>
         </div>
       )}
@@ -168,52 +257,52 @@ export function CashPage() {
       {tab === 'closings' && (
         <div>
           {canCreateClosing && (
-            <button onClick={() => setShowCloseForm(true)} className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
-              + Nuevo Cierre
+            <button onClick={() => setShowCloseForm(true)} className="inline-flex items-center gap-1.5 mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+              <Vault size={16} weight="duotone" /> Nuevo Cierre
             </button>
           )}
 
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left p-3">Fecha</th>
-                  <th className="text-right p-3">Esperado</th>
-                  <th className="text-right p-3">Real</th>
-                  <th className="text-right p-3">Diferencia</th>
-                  <th className="text-left p-3">Notas</th>
-                  <th className="text-left p-3">Responsable</th>
-                </tr>
-              </thead>
-              <tbody>
-                {closings.map((c) => {
+          <div className="bg-white rounded-xl shadow p-4">
+            <ViewToggle storageKey="cash"
+              data={closings}
+              keyField="id"
+              searchFilter={(c, q) => `${c.user.firstName} ${c.user.lastName}`.toLowerCase().includes(q)}
+              searchPlaceholder="Buscar por responsable..."
+              cardTitle={(c) => `Cierre - ${c.user.firstName} ${c.user.lastName}`}
+              cardSubtitle={(c) => formatDateTime(c.createdAt)}
+              cardBadge={(c) => {
+                const diff = parseFloat(c.difference);
+                return <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${diff >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {diff >= 0 ? '+' : ''}{formatCurrency(c.difference)}
+                </span>;
+              }}
+              columns={[
+                { key: 'date', label: 'Fecha', render: (c) => formatDateTime(c.createdAt), cardHidden: true },
+                { key: 'expected', label: 'Esperado', render: (c) => formatCurrency(c.expectedAmount) },
+                { key: 'actual', label: 'Real', render: (c) => formatCurrency(c.actualAmount) },
+                { key: 'diff', label: 'Diferencia', render: (c) => {
                   const diff = parseFloat(c.difference);
-                  return (
-                    <tr key={c.id} className="border-t">
-                      <td className="p-3">{formatDateTime(c.createdAt)}</td>
-                      <td className="p-3 text-right">{formatCurrency(c.expectedAmount)}</td>
-                      <td className="p-3 text-right">{formatCurrency(c.actualAmount)}</td>
-                      <td className={`p-3 text-right font-bold ${diff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {diff >= 0 ? '+' : ''}{formatCurrency(c.difference)}
-                      </td>
-                      <td className="p-3 text-gray-500">{c.notes || '-'}</td>
-                      <td className="p-3">{c.user.firstName} {c.user.lastName}</td>
-                    </tr>
-                  );
-                })}
-                {closings.length === 0 && (
-                  <tr><td colSpan={6} className="p-4 text-center text-gray-400">Sin cierres</td></tr>
-                )}
-              </tbody>
-            </table>
+                  return <span className={`font-bold ${diff >= 0 ? 'text-green-600' : 'text-red-500'}`}>{diff >= 0 ? '+' : ''}{formatCurrency(c.difference)}</span>;
+                }, cardHidden: true },
+                { key: 'notes', label: 'Notas', render: (c) => <span className="text-gray-500">{c.notes || '-'}</span> },
+                { key: 'user', label: 'Responsable', render: (c) => `${c.user.firstName} ${c.user.lastName}`, cardHidden: true },
+              ]}
+              emptyMessage="Sin cierres de caja"
+              onCreateNew={() => setShowCloseForm(true)}
+              createNewLabel="Nuevo cierre"
+            />
           </div>
         </div>
       )}
 
       {/* Modal: Nuevo movimiento */}
-      {showMovForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowMovForm(false)}>
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+      {showMovForm && (<Portal>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={() => setShowMovForm(false)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-xl max-h-[90vh] overflow-auto relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowMovForm(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+              <X size={18} weight="bold" />
+            </button>
             <h3 className="text-lg font-bold mb-4">Nuevo Movimiento de Caja</h3>
             <div className="space-y-3">
               <div>
@@ -221,13 +310,13 @@ export function CashPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setMovType('CASH_IN')}
-                    className={`flex-1 py-2 rounded text-sm font-medium ${movType === 'CASH_IN' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium ${movType === 'CASH_IN' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
                   >
                     Entrada
                   </button>
                   <button
                     onClick={() => setMovType('CASH_OUT')}
-                    className={`flex-1 py-2 rounded text-sm font-medium ${movType === 'CASH_OUT' ? 'bg-red-600 text-white' : 'bg-gray-200'}`}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium ${movType === 'CASH_OUT' ? 'bg-red-500 text-white' : 'bg-gray-200'}`}
                   >
                     Salida
                   </button>
@@ -235,52 +324,80 @@ export function CashPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Monto ($)</label>
-                <input type="number" value={movAmount} onChange={(e) => setMovAmount(e.target.value)} className="w-full px-3 py-2 border rounded-md" min="0.01" step="0.01" />
+                <CurrencyInput value={movAmount} onChange={setMovAmount} className="w-full pr-3 py-2 border rounded-lg" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Motivo</label>
-                <input type="text" value={movReason} onChange={(e) => setMovReason(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ej: Cambio para caja" />
+                <input type="text" value={movReason} onChange={(e) => setMovReason(e.target.value)} className="w-full px-3 py-2 border rounded-lg" placeholder="Ej: Cambio para caja" />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowMovForm(false)} className="flex-1 py-2 bg-gray-200 rounded-md text-sm">Cancelar</button>
-              <button onClick={submitMovement} className="flex-1 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700">Registrar</button>
+              <button onClick={() => setShowMovForm(false)} className="flex-1 py-2 bg-gray-200 rounded-lg text-sm">Cancelar</button>
+              <button onClick={submitMovement} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Registrar</button>
             </div>
           </div>
         </div>
-      )}
+      </Portal>)}
+
+      {/* Modal: Fondo de apertura */}
+      {showOpeningForm && (<Portal>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={() => setShowOpeningForm(false)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowOpeningForm(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+              <X size={18} weight="bold" />
+            </button>
+            <h3 className="text-lg font-bold mb-1">Fondo de Apertura</h3>
+            <p className="text-sm text-gray-500 mb-4">Registra el efectivo inicial en caja al abrir el turno.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Monto de apertura ($)</label>
+                <CurrencyInput value={openingAmount} onChange={setOpeningAmount} className="w-full pr-3 py-2 border rounded-lg" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShowOpeningForm(false)} className="flex-1 py-2 bg-gray-200 rounded-lg text-sm">Cancelar</button>
+              <button onClick={submitOpening} className="flex-1 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 font-medium">Registrar Apertura</button>
+            </div>
+          </div>
+        </div>
+      </Portal>)}
 
       {/* Modal: Nuevo cierre */}
-      {showCloseForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCloseForm(false)}>
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+      {showCloseForm && (<Portal>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={() => setShowCloseForm(false)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-xl max-h-[90vh] overflow-auto relative" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowCloseForm(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+              <X size={18} weight="bold" />
+            </button>
             <h3 className="text-lg font-bold mb-4">Cierre de Caja</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium mb-1">Monto esperado ($)</label>
-                <input type="number" value={expectedAmount} onChange={(e) => setExpectedAmount(e.target.value)} className="w-full px-3 py-2 border rounded-md" min="0" step="0.01" />
+                <CurrencyInput value={expectedAmount} onChange={setExpectedAmount} className="w-full pr-3 py-2 border rounded-lg" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Monto real ($)</label>
-                <input type="number" value={actualAmount} onChange={(e) => setActualAmount(e.target.value)} className="w-full px-3 py-2 border rounded-md" min="0" step="0.01" />
+                <CurrencyInput value={actualAmount} onChange={setActualAmount} className="w-full pr-3 py-2 border rounded-lg" />
               </div>
               {expectedAmount && actualAmount && (
-                <div className={`p-3 rounded-md text-sm font-medium ${difference >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                <div className={`p-3 rounded-lg text-sm font-medium ${difference >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                   Diferencia: {difference >= 0 ? '+' : ''}{formatCurrency(difference)}
                 </div>
               )}
               <div>
                 <label className="block text-sm font-medium mb-1">Notas (opcional)</label>
-                <textarea value={closeNotes} onChange={(e) => setCloseNotes(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} />
+                <textarea value={closeNotes} onChange={(e) => setCloseNotes(e.target.value)} className="w-full px-3 py-2 border rounded-lg" rows={2} />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowCloseForm(false)} className="flex-1 py-2 bg-gray-200 rounded-md text-sm">Cancelar</button>
-              <button onClick={submitClosing} className="flex-1 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">Registrar Cierre</button>
+              <button onClick={() => setShowCloseForm(false)} className="flex-1 py-2 bg-gray-200 rounded-lg text-sm">Cancelar</button>
+              <button onClick={submitClosing} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Registrar Cierre</button>
             </div>
           </div>
         </div>
-      )}
+      </Portal>)}
     </div>
   );
 }
