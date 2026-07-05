@@ -1,4 +1,9 @@
-export const API_URL = '/api';
+// En desarrollo: proxy local (Vite)
+// En producción (Vercel): URL del backend desplegado
+export const API_URL = import.meta.env.VITE_API_URL || '/api';
+
+// Socket.IO URL (para producción, necesita URL completa del backend)
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || '';
 
 export const ROLES = {
   ADMIN: 'ADMIN',
