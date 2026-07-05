@@ -249,6 +249,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!localStorage.getItem('token')) return;
     const socket = getRootSocket();
+    if (!socket) return; // Demo mode - no WebSocket
     const onNew = (n: ServerNotification) => {
       setServerNotifications((prev) => {
         if (prev.find((x) => x.id === n.id)) return prev;
