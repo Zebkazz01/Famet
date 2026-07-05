@@ -7,26 +7,49 @@
   "devCommand": "npm run dev",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://fameat-backend.up.railway.app/api/:path*"
+      "source": "/api/health",
+      "destination": "/api/health.js"
     },
     {
-      "source": "/uploads/:path*",
-      "destination": "https://fameat-backend.up.railway.app/uploads/:path*"
+      "source": "/api/auth/login",
+      "destination": "/api/auth/login.js"
     },
     {
-      "source": "/socket.io/:path*",
-      "destination": "https://fameat-backend.up.railway.app/socket.io/:path*"
+      "source": "/api/products",
+      "destination": "/api/products/index.js"
+    },
+    {
+      "source": "/api/categories",
+      "destination": "/api/categories/index.js"
+    },
+    {
+      "source": "/api/sales",
+      "destination": "/api/sales/index.js"
+    },
+    {
+      "source": "/api/config",
+      "destination": "/api/config/index.js"
+    },
+    {
+      "source": "/api/inventory/alerts",
+      "destination": "/api/inventory/alerts.js"
+    },
+    {
+      "source": "/api/cash/status",
+      "destination": "/api/cash/status.js"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/[...slug].js"
     }
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
       "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
       ]
     }
   ]
