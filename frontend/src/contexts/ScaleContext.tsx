@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-export type WeightUnit = 'kg' | 'lb' | 'g';
+export type WeightUnit = 'kg' | 'lb' | 'g' | '@';
 
 interface ProcessedReading {
   rawWeight: number;
@@ -49,6 +49,10 @@ interface ScaleContextType {
   disableScale: () => void;
   /** Re-habilitar y reconectar balanza */
   enableScale: () => void;
+  /** Re-detectar puerto y reconectar (hot-plug) */
+  reconnect: () => Promise<{ ok: boolean; port?: string; error?: string }>;
+  /** Estado de reconexión en curso */
+  reconnecting: boolean;
 }
 
 const ScaleContext = createContext<ScaleContextType>({
@@ -72,6 +76,8 @@ const ScaleContext = createContext<ScaleContextType>({
   resetProcessor: () => {},
   disableScale: () => {},
   enableScale: () => {},
+  reconnect: async () => ({ ok: false }),
+  reconnecting: false,
 });
 
 export function ScaleProvider({ children }: { children: ReactNode }) {
@@ -209,6 +215,29 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
     connectSocket();
   }, [connectSocket]);
 
+  const [reconnecting, setReconnecting] = useState(false);
+  const reconnect = useCallback(async () => {
+    setReconnecting(true);
+    try {
+      const token = localStorage.getItem('token') || '';
+      const r = await fetch('/api/scale/reconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) {
+        // Reconectar socket para refrescar status
+        connectSocket();
+        return { ok: true as const, port: data.port };
+      }
+      return { ok: false as const, error: data.error || `HTTP ${r.status}` };
+    } catch (e: any) {
+      return { ok: false as const, error: e?.message || 'Error de red' };
+    } finally {
+      setReconnecting(false);
+    }
+  }, [connectSocket]);
+
   return (
     <ScaleContext.Provider value={{
       weight, rawWeight, unit, stable, connected,
@@ -217,6 +246,7 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
       captureWeight, tare, clearTare, setUnit, setInputUnit,
       updateProcessorConfig, resetProcessor,
       disableScale, enableScale,
+      reconnect, reconnecting,
     }}>
       {children}
     </ScaleContext.Provider>

@@ -1,0 +1,74 @@
+/**
+ * PWA CSS - POS
+ * Safe areas, overscroll, standalone mode, transiciones
+ */
+
+/* ============================
+   VARIABLES
+   ============================ */
+:root {
+  --pwa-theme-color: #b91c1c;
+}
+
+/* ============================
+   OVERSCROLL (evitar bounce elástico)
+   ============================ */
+html, body {
+  overscroll-behavior-y: contain;
+}
+
+/* ============================
+   STANDALONE MODE
+   ============================ */
+@media (display-mode: standalone) {
+  /* Barra de estado coloreada (área del notch) */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: var(--pwa-theme-color, #b91c1c);
+    z-index: 99999;
+    pointer-events: none;
+  }
+
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Ocultar elementos que solo aplican en navegador */
+  .browser-only {
+    display: none !important;
+  }
+}
+
+/* ============================
+   TOUCH TARGETS (mínimo 44px)
+   ============================ */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"],
+  input[type="submit"] {
+    min-height: 44px;
+  }
+}
+
+/* ============================
+   PAGE TRANSITION
+   ============================ */
+body {
+  animation: pwa-fade-in 0.2s ease-out;
+}
+
+@keyframes pwa-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ============================
+   SELECTION & TAP HIGHLIGHT
+   ============================ */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
