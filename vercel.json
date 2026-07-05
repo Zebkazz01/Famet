@@ -2,10 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "name": "fameat-pos",
-  "framework": "vite",
+  "installCommand": "npm install",
   "buildCommand": "npm run build --workspace=frontend",
   "outputDirectory": "frontend/dist",
-  "installCommand": "npm install",
   "headers": [
     {
       "source": "/api/(.*)",
