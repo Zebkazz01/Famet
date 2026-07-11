@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef, type ReactNode, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import client from '../api/client';
 
 export type WeightUnit = 'kg' | 'lb' | 'g' | '@';
 
@@ -91,21 +92,15 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
   const [processorConfig, setProcessorConfig] = useState<ProcessorConfig | null>(null);
   const [inputUnit, setInputUnitState] = useState<WeightUnit>('kg');
   const [status, setStatus] = useState<ScaleStatus>('connecting');
-  const [disabled, setDisabled] = useState(() => localStorage.getItem('scale_disabled') === 'true');
+  const lastStableWeight = useRef(0);
+  const [disabled, setDisabled] = useState(() => {
+    const fromStorage = localStorage.getItem('scale_disabled') === 'true';
+    // Marcamos para intentar fetch desde backend después del montaje
+    return fromStorage;
+  });
   const socketRef = useRef<Socket | null>(null);
 
   const connectSocket = useCallback(() => {
-    // Demo mode (Vercel) - no WebSocket support
-    const isDemo = import.meta.env.VITE_API_URL === '/api' || 
-                   window.location.hostname.includes('vercel.app');
-    
-    if (isDemo) {
-      console.log('[FAMEAT] Demo mode - Scale disabled');
-      setStatus('disabled');
-      setConnected(false);
-      return;
-    }
-
     // Limpiar socket anterior si existe
     if (socketRef.current) {
       socketRef.current.disconnect();
@@ -134,6 +129,11 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
       setStable(reading.stable);
       setTareActive(reading.tareActive);
       setTareOffset(reading.tareOffset);
+      if (reading.stable && reading.weight > 0) {
+        lastStableWeight.current = reading.weight;
+      } else if (reading.weight === 0) {
+        lastStableWeight.current = 0;
+      }
     });
 
     socket.on('status', (s: { connected: boolean }) => {
@@ -169,15 +169,33 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Sincronizar estado disabled con la config global de la BD
+  useEffect(() => {
+    let cancelled = false;
+    client.get('/config').then((r) => {
+      if (cancelled) return;
+      const globalDisabled = r.data?.scale_disabled === 'true';
+      setDisabled(globalDisabled);
+      if (globalDisabled) {
+        localStorage.setItem('scale_disabled', 'true');
+        setStatus('disabled');
+        socketRef.current?.disconnect();
+        socketRef.current = null;
+        setConnected(false);
+      }
+    }).catch(() => {
+      // Silencioso: usuario no autenticado, usar localStorage
+    }).finally(() => {
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   // Conectar al montar (si no está deshabilitada)
   useEffect(() => {
-    const isDemo = import.meta.env.VITE_API_URL === '/api' || 
-                   window.location.hostname.includes('vercel.app');
-    
-    if (isDemo || disabled) {
-      setStatus('disabled');
-    } else {
+    if (!disabled) {
       connectSocket();
+    } else {
+      setStatus('disabled');
     }
     return () => {
       socketRef.current?.disconnect();
@@ -185,7 +203,7 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const captureWeight = useCallback(() => weight, [weight]);
+  const captureWeight = useCallback(() => lastStableWeight.current > 0 ? lastStableWeight.current : weight, [weight]);
 
   const tare = useCallback(() => {
     socketRef.current?.emit('tare');
@@ -221,11 +239,13 @@ export function ScaleProvider({ children }: { children: ReactNode }) {
     setRawWeight(0);
     setStable(false);
     localStorage.setItem('scale_disabled', 'true');
+    client.put('/config', { scale_disabled: 'true' }).catch(() => {});
   }, []);
 
   const enableScale = useCallback(() => {
     setDisabled(false);
     localStorage.removeItem('scale_disabled');
+    client.put('/config', { scale_disabled: 'false' }).catch(() => {});
     connectSocket();
   }, [connectSocket]);
 

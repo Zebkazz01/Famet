@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import client from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, formatDateTime, formatQty } from '../utils/formatters';
 import toast from 'react-hot-toast';
-import { ChartBar, Receipt, Eye, X, ShoppingBag, CurrencyDollar, CreditCard, Money, Funnel, SortAscending, Wallet } from '@phosphor-icons/react';
+import { ChartBar, Receipt, Eye, X, ShoppingBag, CurrencyDollar, CreditCard, Money, Funnel, SortAscending, Wallet, Trash } from '@phosphor-icons/react';
 import { Portal } from '../components/Portal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { StatsCards } from '../components/StatsCards';
 import { PageSkeleton } from '../components/PageSkeleton';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -13,6 +14,7 @@ import { ErrorView } from '../components/ErrorBoundary';
 import { ViewToggle } from '../components/ViewToggle';
 import { FilterPanel, DateRangePicker, Combobox } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 interface Sale {
   id: number;
@@ -27,6 +29,7 @@ interface Sale {
   createdAt: string;
   user: { firstName: string; lastName: string };
   _count: { items: number };
+  productNames: string;
 }
 
 interface SaleDetail {
@@ -77,9 +80,11 @@ export function SalesPage() {
   const { user, hasRole } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [detail, setDetail] = useState<SaleDetail | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
+  const requestId = useRef(0);
   const { filters, setFilter, clear: _clear, activeCount } = useTableFilters<{ range: { from?: string; to?: string }; paymentMethod: string; corrected: string; sort: string }>({
     range: { from: '', to: '' },
     paymentMethod: '',
@@ -94,16 +99,30 @@ export function SalesPage() {
   const [showCorrection, setShowCorrection] = useState(false);
   const [correctionReason, setCorrectionReason] = useState('');
 
+  useModalEscape(detail ? () => closeDetail() : null);
+  useModalEscape(showCorrection ? () => setShowCorrection(false) : null);
+
   const showSummary = hasRole('ADMIN', 'SUPERVISOR');
 
-  const load = () => {
+  const load = useCallback((from?: string, to?: string) => {
+    const id = ++requestId.current;
+    setLoading(true);
+    setLoadError(null);
     Promise.all([
-      client.get('/sales', { params: { ...(dateFrom ? { from: dateFrom } : {}), ...(dateTo ? { to: dateTo } : {}), limit: 500 } }).then((r) => setSales(r.data)),
-      showSummary ? client.get(`/sales/summary?date=${dateFrom || new Date().toISOString().split('T')[0]}`).then((r) => setSummary(r.data)).catch(() => {}) : Promise.resolve(),
-    ]).catch((err) => setLoadError(err)).finally(() => setLoading(false));
-  };
+      client.get('/sales', { params: { ...(from ? { from } : {}), ...(to ? { to } : {}), limit: 500 } }).then((r) => {
+        if (id === requestId.current) setSales(r.data);
+      }),
+      showSummary ? client.get(`/sales/summary?date=${from || new Date().toISOString().split('T')[0]}`).then((r) => {
+        if (id === requestId.current) setSummary(r.data);
+      }).catch(() => {}) : Promise.resolve(),
+    ]).catch((err) => {
+      if (id === requestId.current) setLoadError(err);
+    }).finally(() => {
+      if (id === requestId.current) setLoading(false);
+    });
+  }, [showSummary]);
 
-  useEffect(load, [dateFrom, dateTo]);
+  useEffect(() => { load(dateFrom, dateTo); }, [dateFrom, dateTo, load]);
 
   const viewDetail = async (id: number) => {
     const { data } = await client.get(`/sales/${id}`);
@@ -151,9 +170,23 @@ export function SalesPage() {
       setCorrectionReason('');
       // Reload detail and list
       viewDetail(detail.id);
-      load();
+      load(dateFrom, dateTo);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Error al corregir');
+    }
+  };
+
+  const handleDeleteSale = async () => {
+    if (!confirmDelete) return;
+    try {
+      await client.delete(`/sales/${confirmDelete}`);
+      toast.success('Venta anulada exitosamente');
+      setDetail(null);
+      setConfirmDelete(null);
+      load(dateFrom, dateTo);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al anular venta');
+      setConfirmDelete(null);
     }
   };
 
@@ -165,6 +198,20 @@ export function SalesPage() {
   };
 
   const payMethodLabel: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta', TRANSFER: 'Transfer.' };
+
+  const fiadoStats = useMemo(() => {
+    const creditSales = sales.filter(s => s.isCredit);
+    const totalFiado = creditSales.reduce((sum, s) => sum + Number(s.creditBalance || 0), 0);
+    const byCustomer = new Map<number, { name: string; total: number }>();
+    for (const s of creditSales) {
+      if (!s.customer) continue;
+      const existing = byCustomer.get(s.customer.id);
+      if (existing) existing.total += Number(s.creditBalance || 0);
+      else byCustomer.set(s.customer.id, { name: s.customer.name, total: Number(s.creditBalance || 0) });
+    }
+    const topDebtor = [...byCustomer.values()].sort((a, b) => b.total - a.total)[0];
+    return { totalFiado, topDebtor: topDebtor || null };
+  }, [sales]);
 
   if (loading) return <PageSkeleton type="table" />;
   if (loadError) return <ErrorView error={loadError} onRetry={() => { setLoadError(null); setLoading(true); }} />;
@@ -180,13 +227,13 @@ export function SalesPage() {
       <StatsCards cards={[
         { label: 'Ventas', value: sales.length, icon: <ShoppingBag size={20} weight="duotone" />, color: 'bg-blue-100 text-blue-600' },
         { label: 'Ingresos', value: formatCurrency(sales.reduce((s, v) => s + parseFloat(v.total), 0)), icon: <CurrencyDollar size={20} weight="duotone" />, color: 'bg-green-100 text-green-600' },
-        { label: 'Efectivo', value: formatCurrency(sales.filter(v => v.paymentMethod === 'CASH').reduce((s, v) => s + parseFloat(v.total), 0)), icon: <Money size={20} weight="duotone" />, color: 'bg-amber-100 text-amber-600' },
-        { label: 'Tarjeta/Transfer.', value: formatCurrency(sales.filter(v => v.paymentMethod !== 'CASH').reduce((s, v) => s + parseFloat(v.total), 0)), icon: <CreditCard size={20} weight="duotone" />, color: 'bg-purple-100 text-purple-600' },
+        { label: 'Efectivo', value: formatCurrency(sales.filter(v => v.paymentMethod === 'CASH').reduce((s, v) => s + parseFloat(v.total), 0)), icon: <Money size={20} weight="duotone" />, color: 'bg-amber-100 text-amber-600', sub: `Tarjeta/Transfer: ${formatCurrency(sales.filter(v => v.paymentMethod !== 'CASH').reduce((s, v) => s + parseFloat(v.total), 0))}` },
+        { label: 'Fiado', value: fiadoStats.totalFiado > 0 ? formatCurrency(fiadoStats.totalFiado) : 'Sin deudas', icon: <Wallet size={20} weight="duotone" />, color: fiadoStats.totalFiado > 0 ? 'bg-rose-100 text-rose-600' : 'bg-green-100 text-green-600', sub: fiadoStats.totalFiado > 0 && fiadoStats.topDebtor ? `Más debe: ${fiadoStats.topDebtor.name} (${formatCurrency(fiadoStats.topDebtor.total)})` : undefined },
       ]} />
 
       {/* Filtros */}
       <div id="sales-date-filters" className="mb-4">
-        <FilterPanel storageKey="sales"
+        <FilterPanel storageKey="sales" toggleOnEvent="fameat:toggle-filters"
           activeCount={activeCount}
           onClear={() => {
             setFilter('range', {});
@@ -242,31 +289,9 @@ export function SalesPage() {
         </FilterPanel>
       </div>
 
-      {/* Resumen del dia */}
-      {showSummary && summary && (
-        <div id="sales-summary" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500">Ventas del dia</div>
-            <div className="text-2xl font-bold">{summary.totalSales}</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500">Total del dia</div>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(summary.totalRevenue)}</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500">Efectivo</div>
-            <div className="text-2xl font-bold">{formatCurrency(summary.byPayment.CASH)}</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500">Tarjeta + Transfer.</div>
-            <div className="text-2xl font-bold">{formatCurrency(parseFloat(summary.byPayment.CARD) + parseFloat(summary.byPayment.TRANSFER))}</div>
-          </div>
-        </div>
-      )}
-
       {/* Lista de ventas */}
       <div id="sales-list" className="bg-white rounded-xl shadow p-4">
-        <ViewToggle storageKey="sales"
+        <ViewToggle storageKey="sales" searchInputProps={{ 'data-search-input': '' }}
           data={sales.filter((s) => {
             if (filters.paymentMethod && s.paymentMethod !== filters.paymentMethod) return false;
             if (filters.corrected === 'yes' && !s.corrected) return false;
@@ -281,8 +306,8 @@ export function SalesPage() {
             return 0;
           })}
           keyField="id"
-          searchFilter={(s, q) => `${s.id}`.includes(q) || `${s.user.firstName} ${s.user.lastName}`.toLowerCase().includes(q)}
-          searchPlaceholder="Buscar por # o cajero..."
+          searchFilter={(s, q) => `${s.id}`.includes(q) || `${s.user.firstName} ${s.user.lastName}`.toLowerCase().includes(q) || s.productNames.toLowerCase().includes(q)}
+          searchPlaceholder="Buscar por #, cajero o producto..."
           cardTitle={(s) => <span className="cursor-pointer" onClick={() => viewDetail(s.id)}>Venta #{s.id}</span>}
           cardSubtitle={(s) => formatDateTime(s.createdAt)}
           cardBadge={(s) => {
@@ -580,6 +605,18 @@ export function SalesPage() {
                 Copiar ID
               </button>
               <div className="flex items-center gap-2">
+                {hasRole('ADMIN') && !detail.corrected && (
+                  <button onClick={() => setConfirmDelete(detail.id)}
+                    className="px-3 py-1.5 text-xs font-medium bg-red-100 border border-red-300 text-red-700 rounded-lg hover:bg-red-200 inline-flex items-center gap-1.5">
+                    <Trash size={14} weight="duotone" /> Anular venta
+                  </button>
+                )}
+                {hasRole('ADMIN') && detail.corrected && (
+                  <button onClick={() => setConfirmDelete(detail.id)}
+                    className="px-3 py-1.5 text-xs font-medium bg-red-100 border border-red-300 text-red-700 rounded-lg hover:bg-red-200 inline-flex items-center gap-1.5">
+                    <Trash size={14} weight="duotone" /> Eliminar venta
+                  </button>
+                )}
                 {canCorrect(detail) && !showCorrection && (
                   <button onClick={() => setShowCorrection(true)}
                     className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-700 border border-yellow-400 text-yellow-700 dark:text-yellow-300 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/20 inline-flex items-center gap-1.5">
@@ -595,6 +632,18 @@ export function SalesPage() {
           </div>
         </div>
       </Portal>)}
+
+      <ConfirmModal
+        open={confirmDelete !== null}
+        title={detail?.corrected ? 'Eliminar venta' : 'Anular venta'}
+        message={detail?.corrected
+          ? 'Esta venta ya está anulada. Se eliminará permanentemente de la base de datos. ¿Estás seguro?'
+          : 'Esta acción restaurará el stock de todos los productos de la venta y eliminará el registro permanentemente. ¿Estás seguro?'}
+        variant="danger"
+        confirmText={detail?.corrected ? 'Eliminar' : 'Anular y eliminar'}
+        onConfirm={handleDeleteSale}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

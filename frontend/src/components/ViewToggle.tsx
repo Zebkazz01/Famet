@@ -22,6 +22,7 @@ interface ViewToggleProps<T> {
   emptyIcon?: React.ReactNode;
   searchPlaceholder?: string;
   searchFilter?: (item: T, query: string) => boolean;
+  searchInputProps?: React.InputHTMLAttributes<HTMLInputElement> & Record<string, string>;
   pageSize?: number;
   defaultView?: 'table' | 'cards';
   onCreateNew?: () => void;
@@ -35,7 +36,7 @@ const VIEW_PREFIX = 'fameat-view-toggle-';
 export function ViewToggle<T extends Record<string, any>>({
   data, columns, keyField, cardTitle, cardSubtitle, cardBadge, cardActions, cardImage,
   emptyMessage = 'Sin datos', emptyIcon, searchPlaceholder = 'Buscar...',
-  searchFilter, pageSize = 10, defaultView = 'table',
+  searchFilter, searchInputProps, pageSize = 10, defaultView = 'table',
   onCreateNew, createNewLabel = 'Crear nuevo', storageKey,
 }: ViewToggleProps<T>) {
   const [view, setView] = useState<'table' | 'cards'>(() => {
@@ -73,7 +74,12 @@ export function ViewToggle<T extends Record<string, any>>({
   }, [perPage, storageKey]);
 
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
+    const handler = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setView('cards');
+    };
+    handler();
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
@@ -114,6 +120,7 @@ export function ViewToggle<T extends Record<string, any>>({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
+                {...searchInputProps}
                 className="w-full pl-8 pr-8 h-9 text-sm border border-gray-200 dark:border-gray-700 dark:bg-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
               />
               {search && (
@@ -139,22 +146,24 @@ export function ViewToggle<T extends Record<string, any>>({
               <option key={n} value={n}>{n} / pág</option>
             ))}
           </select>
-          <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden h-9">
-            <button
-              onClick={() => setView('table')}
-              className={`h-full w-10 transition-colors flex items-center justify-center ${view === 'table' ? 'bg-red-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
-              title="Vista tabla"
-            >
-              <Table size={16} weight="duotone" />
-            </button>
-            <button
-              onClick={() => setView('cards')}
-              className={`h-full w-10 transition-colors flex items-center justify-center ${view === 'cards' ? 'bg-red-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
-              title="Vista tarjetas"
-            >
-              <SquaresFour size={16} weight="duotone" />
-            </button>
-          </div>
+          {!isMobile && (
+            <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden h-9">
+              <button
+                onClick={() => setView('table')}
+                className={`h-full w-10 transition-colors flex items-center justify-center ${view === 'table' ? 'bg-red-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+                title="Vista tabla"
+              >
+                <Table size={16} weight="duotone" />
+              </button>
+              <button
+                onClick={() => setView('cards')}
+                className={`h-full w-10 transition-colors flex items-center justify-center ${view === 'cards' ? 'bg-red-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+                title="Vista tarjetas"
+              >
+                <SquaresFour size={16} weight="duotone" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

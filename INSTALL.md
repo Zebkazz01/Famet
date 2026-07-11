@@ -115,8 +115,11 @@ npm start           :: arranca el servidor
 O **doble-click a `POS.bat`** — detecta automáticamente:
 - Si falta `backend/.env` → corre setup
 - Si falta `backend/dist` → compila
-- Si hay certs HTTPS → arranca con HTTPS
+- Si la Root CA está instalada en Windows → arranca con **HTTPS** (sin advertencias)
+- Si la Root CA no está instalada → arranca con **HTTP** (seguro, sin advertencias)
+- Muestra fases de carga detalladas (conectando BD, cargando módulos, etc.)
 - Lanza la PWA en modo standalone (Chrome `--app=URL` si está instalado, Edge fallback)
+- Al cerrar el navegador, detiene el servidor y cierra la terminal automáticamente
 
 Para correr en **modo desarrollo** (hot reload, sólo desde el PC):
 ```cmd
@@ -129,49 +132,72 @@ npm run dev         :: backend :3001 + frontend Vite :5174
 
 PWA install y `getUserMedia` (cámara para barcode scanner) **sólo funcionan en HTTPS** (excepto en `localhost`).
 
-### Opción 1 — mkcert (recomendado para LAN)
+### Generación automática de certificados
 
-`mkcert` genera certs locales de confianza para tu PC y dispositivos. Una vez instalado:
+El sistema genera automáticamente sus propios certificados al arrancar usando `scripts/ensure-certs.js`:
+- Crea una **Root CA** local (autoridad certificadora propia)
+- Genera un **certificado de servidor firmado** por esa Root CA
+- Incluye `localhost`, `127.0.0.1` y las IPs LAN detectadas
+
+No requieres `mkcert` ni OpenSSL. Solo Node.js.
+
+### Hacer confiable el certificado en Windows
+
+Ejecuta **una sola vez** como **ADMINISTRADOR** para que el navegador confíe en el certificado sin advertencias:
 
 ```cmd
-:: 1. Instalar CA local (una sola vez por máquina)
-mkcert -install
-
-:: 2. Generar cert para localhost + tu IP de LAN
-cd C:\Users\zebka\Documents\fameat\frontend
-mkcert -key-file key.pem -cert-file cert.pem localhost 127.0.0.1 192.168.100.7
+certutil -addstore -f Root "C:\ruta\del\proyecto\frontend\public\rootCA.pem"
 ```
 
-Cambia `192.168.100.7` por la IP real de tu PC en la red (averígualo con `ipconfig` → IPv4 del adaptador WiFi).
+O desde el menú:
+1. Abre `frontend\public\rootCA.pem` (clic derecho → Abrir)
+2. Clic en **"Instalar certificado"**
+3. Elegir **"Equipo local"** → Siguiente
+4. Elegir **"Colocar todos los certificados en el siguiente almacén"**
+5. Examinar → **"Entidades de certificación raíz de confianza"** → Aceptar
+6. Siguiente → Finalizar
 
-### Opción 2 — Cert auto-firmado (warning del navegador)
+> **Nota**: Si no instalas la Root CA, el sistema usará **HTTP** automáticamente y no verás advertencias SSL en el PC. Para acceso móvil necesitarás instalar el certificado en el celular (ver abajo).
 
-Si ya tienes cert.pem + key.pem propios, déjalos en `frontend/`.
+### Arranque automático
 
-### Arrancar con HTTPS
+**`POS.bat`** (doble clic) decide automáticamente:
+- Si la Root CA está instalada en Windows → arranca con **HTTPS** (sin advertencias)
+- Si la Root CA no está instalada → arranca con **HTTP** (sin advertencias en local)
+
+Verás en la terminal:
+```
+[OK] Certificado SSL confiable detectado
+```
+o
+```
+[!] Usando HTTP (sin HTTPS) para evitar advertencias del navegador
+```
+
+### Arrancar manualmente con HTTPS
 
 ```cmd
 npm run start:https
 ```
 
-O simplemente **`POS.bat`** detecta los certs y arranca con HTTPS automáticamente.
+O si la CA está instalada, simplemente:
+```cmd
+POS.bat
+```
 
 Verás:
 ```
 [server] escuchando en https://0.0.0.0:3001
 ```
 
-URLs:
-- PC: `https://localhost:3001`
-- LAN: `https://192.168.100.7:3001`
-
 ### Instalar el CA en el celular
 
-Para que el celular acepte el cert sin warning:
-1. `mkcert -CAROOT` → te muestra la carpeta donde está `rootCA.pem`
-2. Envíalo al celular (email, WhatsApp, etc.)
-3. Android: Ajustes → Seguridad → Cifrado → Instalar certificado → Certificado CA → seleccionar `rootCA.pem`
-4. iPhone: enviarlo por AirDrop → Ajustes → Perfil descargado → Instalar → Ajustes → General → Información → Ajustes de confianza del certificado → activar
+Para que el celular acepte el cert sin warning al acceder desde la red local:
+
+1. Busca el archivo `frontend\public\rootCA.pem` en la carpeta del proyecto
+2. Envíalo al celular (email, WhatsApp, compartir por red, etc.)
+3. **Android**: Ajustes → Seguridad → Cifrado → Instalar certificado → Certificado CA → seleccionar `rootCA.pem`
+4. **iPhone**: enviarlo por AirDrop → Ajustes → Perfil descargado → Instalar → Ajustes → General → Información → Ajustes de confianza del certificado → activar
 
 ---
 
@@ -340,8 +366,18 @@ taskkill /PID <pid> /F
 ### Cámara no funciona en celular
 HTTP no permite getUserMedia. Necesitas HTTPS — ver [sección 5](#5-https-para-pwa--cámara).
 
+### Cert HTTPS no es de confianza en PC (escritorio)
+Ejecuta como administrador una vez:
+```cmd
+certutil -addstore -f Root "frontend\public\rootCA.pem"
+```
+O abre `frontend\public\rootCA.pem` → Instalar certificado → Equipo local → Entidades de certificación raíz de confianza.
+
 ### Cert HTTPS no es de confianza en celular
-Instala el `rootCA.pem` de mkcert en el celular ([sección 5](#5-https-para-pwa--cámara) al final).
+Instala el `rootCA.pem` en el celular ([sección 5](#5-https-para-pwa--cámara) al final).
+
+### El navegador muestra "No seguro" o "Your connection is not private"
+El sistema detecta automáticamente si la Root CA está instalada. Si no lo está, usa HTTP para evitar advertencias. Para solucionarlo: instala la Root CA como se indica arriba y vuelve a abrir `POS.bat`.
 
 ### Backend no responde desde celular
 Verifica:
@@ -383,6 +419,7 @@ npm run db:seed
 | `npm run setup` | Instalación inicial completa |
 | `npm run build` | Compila backend + frontend |
 | `npm run shortcut` | Regenera icono escritorio |
+| `certutil -addstore -f Root "frontend\public\rootCA.pem"` | Instalar certificado SSL (como admin) |
 
 ### Base de datos
 | Comando | Descripción |

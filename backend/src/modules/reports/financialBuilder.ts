@@ -184,10 +184,19 @@ export async function build(range: FinancialRange, opts: { includeDaily?: boolea
   return result;
 }
 
+function parseDateParam(value: string, endOfDay: boolean): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split("-").map(Number);
+    if (endOfDay) return new Date(y, m - 1, d, 23, 59, 59, 999);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(value);
+}
+
 export function parseRange(from?: string, to?: string): FinancialRange {
   const today = new Date();
-  const f = from ? new Date(from + "T00:00:00") : new Date(today.getFullYear(), today.getMonth(), 1);
-  const t = to ? new Date(to + "T23:59:59") : today;
+  const f = from ? parseDateParam(from, false) : new Date(today.getFullYear(), today.getMonth(), 1);
+  const t = to ? parseDateParam(to, true) : today;
   return { from: f, to: t };
 }
 

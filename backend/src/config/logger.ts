@@ -41,8 +41,25 @@ export function printBanner(startTime: number) {
   console.log("");
   console.log(`${c.bold}  Servidor listo en ${c.green}${elapsed}ms${c.reset}`);
   console.log("");
+  // Obtener IP LAN para mostrar en el banner
+  let lanIp = "127.0.0.1";
+  try {
+    const ifaces = os.networkInterfaces();
+    for (const iface of Object.values(ifaces)) {
+      if (!iface) continue;
+      for (const addr of iface) {
+        if (addr.family === "IPv4" && !addr.internal) {
+          lanIp = addr.address;
+          break;
+        }
+      }
+      if (lanIp !== "127.0.0.1") break;
+    }
+  } catch {}
+
   console.log(`  ${c.bold}Endpoints${c.reset}`);
   console.log(`  ${c.dim}├─${c.reset} Local:    ${c.cyan}${c.bold}http://localhost:${env.PORT}${c.reset}`);
+  console.log(`  ${c.dim}├─${c.reset} Red:      ${c.cyan}${c.bold}http://${lanIp}:${env.PORT}${c.reset}`);
   console.log(`  ${c.dim}├─${c.reset} API:      ${c.cyan}http://localhost:${env.PORT}/api${c.reset}`);
   console.log(`  ${c.dim}└─${c.reset} Socket:   ${c.cyan}http://localhost:${env.PORT}/scale${c.reset} ${c.dim}(WebSocket)${c.reset}`);
   console.log("");

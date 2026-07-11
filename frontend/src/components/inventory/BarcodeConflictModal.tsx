@@ -2,6 +2,7 @@ import { Portal } from '../Portal';
 import { Warning, Package, ArrowRight, Plus, X, Tag } from '@phosphor-icons/react';
 import { Button, Badge } from '../ui';
 import type { ResolvedBarcode } from '../../api/barcodes';
+import { useModalEscape } from '../../contexts/ModalStackContext';
 
 export interface BarcodeConflictModalProps {
   open: boolean;
@@ -18,6 +19,7 @@ export interface BarcodeConflictModalProps {
 export function BarcodeConflictModal({
   open, resolved, onClose, onAssignToSuggested, onUseExact, onCreateNew,
 }: BarcodeConflictModalProps) {
+  useModalEscape(onClose);
   if (!open || !resolved) return null;
 
   const { code, category, exactProduct, suggestedProduct, knownAliases } = resolved;

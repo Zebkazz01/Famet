@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState, useEffect, useCallback } from 'react';
 import { Funnel, CaretDown, X } from '@phosphor-icons/react';
 import { cn } from './tokens';
 import { Button } from './Button';
@@ -24,6 +24,8 @@ export interface FilterPanelProps {
   childrenLayout?: string;
   /** Key para persistir estado abierto/cerrado en localStorage. Si se omite, no recuerda. */
   storageKey?: string;
+  /** Nombre del custom event que togglea el panel (ej: "fameat:toggle-filters"). */
+  toggleOnEvent?: string;
   children: ReactNode;
   className?: string;
 }
@@ -38,6 +40,7 @@ export function FilterPanel({
   defaultOpen = true,
   childrenLayout = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3',
   storageKey,
+  toggleOnEvent,
   children,
   className,
 }: FilterPanelProps) {
@@ -55,6 +58,13 @@ export function FilterPanel({
     if (!storageKey) return;
     try { localStorage.setItem(STORAGE_PREFIX + storageKey, String(open)); } catch {}
   }, [open, storageKey]);
+
+  useEffect(() => {
+    if (!toggleOnEvent) return;
+    const handler = () => setOpen((v) => !v);
+    window.addEventListener(toggleOnEvent, handler);
+    return () => window.removeEventListener(toggleOnEvent, handler);
+  }, [toggleOnEvent]);
 
   return (
     <div

@@ -84,6 +84,14 @@ export async function getMovement(req: Request, res: Response) {
   return res.json(movement);
 }
 
+export async function deleteMovement(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const movement = await prisma.inventoryMovement.findUnique({ where: { id } });
+  if (!movement) return res.status(404).json({ error: "Movimiento no encontrado" });
+  await prisma.inventoryMovement.delete({ where: { id } });
+  return res.json({ message: "Movimiento de inventario eliminado" });
+}
+
 export async function getAlerts(_req: Request, res: Response) {
   const products = await prisma.product.findMany({
     where: {

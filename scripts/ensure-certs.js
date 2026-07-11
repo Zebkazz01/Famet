@@ -1,23 +1,14 @@
 #!/usr/bin/env node
-/**
- * Genera certs self-signed para HTTPS LAN si no existen.
- * - Detecta IPs LAN del equipo y las incluye en el SAN del certificado.
- * - Solo regenera si faltan los archivos o si una IP nueva no está en el cert actual.
- * - No requiere mkcert ni OpenSSL externo.
- *
- * Salida: frontend/cert.pem + frontend/key.pem
- *
- * Uso:
- *   node scripts/ensure-certs.js          # genera solo si faltan
- *   node scripts/ensure-certs.js --force  # regenera siempre
- */
 const fs = require('fs');
 const path = require('path');
 const { networkInterfaces } = require('os');
+const { execSync } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
-const certPath = path.join(root, 'frontend', 'cert.pem');
-const keyPath = path.join(root, 'frontend', 'key.pem');
+const frontendDir = path.join(root, 'frontend');
+const certPath = path.join(frontendDir, 'cert.pem');
+const keyPath = path.join(frontendDir, 'key.pem');
+const rootCAPath = path.join(frontendDir, 'public', 'rootCA.pem');
 const force = process.argv.includes('--force');
 
 function getLanIPs() {
@@ -32,64 +23,69 @@ function getLanIPs() {
 }
 
 const lanIPs = getLanIPs();
+
+if (!force && fs.existsSync(certPath) && fs.existsSync(keyPath) && fs.existsSync(rootCAPath)) {
+  process.exit(0);
+}
+
+const forge = require('node-forge');
+const pki = forge.pki;
+
+// 1. Root CA
+const caKeys = pki.rsa.generateKeyPair(2048);
+const caCert = pki.createCertificate();
+caCert.publicKey = caKeys.publicKey;
+caCert.serialNumber = '01';
+caCert.validity.notBefore = new Date();
+caCert.validity.notAfter = new Date();
+caCert.validity.notAfter.setFullYear(caCert.validity.notBefore.getFullYear() + 10);
+
+const caAttrs = [{ name: 'commonName', value: 'FAMEAT POS Root CA' }];
+caCert.setSubject(caAttrs);
+caCert.setIssuer(caAttrs);
+caCert.setExtensions([
+  { name: 'basicConstraints', cA: true, critical: true },
+  { name: 'keyUsage', keyCertSign: true, cRLSign: true, critical: true },
+]);
+caCert.sign(caKeys.privateKey, forge.md.sha256.create());
+
+// 2. Server cert
+const serverKeys = pki.rsa.generateKeyPair(2048);
+const serverCert = pki.createCertificate();
+serverCert.publicKey = serverKeys.publicKey;
+serverCert.serialNumber = '02';
+serverCert.validity.notBefore = new Date();
+serverCert.validity.notAfter = new Date();
+serverCert.validity.notAfter.setFullYear(serverCert.validity.notBefore.getFullYear() + 5);
+
+const serverAttrs = [{ name: 'commonName', value: 'FAMEAT POS' }];
+serverCert.setSubject(serverAttrs);
+serverCert.setIssuer(caAttrs);
+
 const altNames = [
   { type: 2, value: 'localhost' },
   { type: 7, ip: '127.0.0.1' },
   ...lanIPs.map((ip) => ({ type: 7, ip })),
 ];
+serverCert.setExtensions([
+  { name: 'basicConstraints', cA: false },
+  { name: 'keyUsage', digitalSignature: true, keyEncipherment: true },
+  { name: 'extKeyUsage', serverAuth: true },
+  { name: 'subjectAltName', altNames },
+]);
+serverCert.sign(caKeys.privateKey, forge.md.sha256.create());
 
-// Si ya existen y no se fuerza, no regenerar
-if (!force && fs.existsSync(certPath) && fs.existsSync(keyPath)) {
-  console.log(`[certs] OK: existen cert.pem y key.pem en frontend/`);
-  if (lanIPs.length) console.log(`[certs] LAN: ${lanIPs.join(', ')}`);
-  process.exit(0);
-}
-
-console.log('[certs] Generando self-signed para LAN...');
-console.log(`[certs] IPs incluidas: ${['localhost', '127.0.0.1', ...lanIPs].join(', ')}`);
-
-let selfsigned;
-try {
-  selfsigned = require('selfsigned');
-} catch {
-  console.error('[certs] Falta el paquete "selfsigned". Ejecuta: npm install');
-  process.exit(1);
-}
-
-const attrs = [{ name: 'commonName', value: 'FAMEAT POS Local' }];
-const pems = selfsigned.generate(attrs, {
-  algorithm: 'sha256',
-  days: 825, // máx para Safari/iOS
-  keySize: 2048,
-  extensions: [
-    { name: 'basicConstraints', cA: false },
-    {
-      name: 'keyUsage',
-      keyCertSign: false,
-      digitalSignature: true,
-      keyEncipherment: true,
-      dataEncipherment: false,
-    },
-    {
-      name: 'extKeyUsage',
-      serverAuth: true,
-      clientAuth: false,
-    },
-    {
-      name: 'subjectAltName',
-      altNames,
-    },
-  ],
-});
-
-// Asegurar que el dir frontend existe (debería existir, pero por las dudas)
+// 3. Guardar
 fs.mkdirSync(path.dirname(certPath), { recursive: true });
-fs.writeFileSync(certPath, pems.cert, 'utf8');
-fs.writeFileSync(keyPath, pems.private, 'utf8');
+fs.mkdirSync(path.join(frontendDir, 'public'), { recursive: true });
 
-console.log('[certs] Generados:');
-console.log(`  ${certPath}`);
-console.log(`  ${keyPath}`);
-console.log('');
-console.log('[certs] Nota: navegadores mostrarán advertencia de cert no confiable.');
-console.log('       En el celular: aceptar "Continuar de todos modos" o instalar el cert.');
+fs.writeFileSync(certPath, pki.certificateToPem(serverCert), 'utf8');
+fs.writeFileSync(keyPath, pki.privateKeyToPem(serverKeys.privateKey), 'utf8');
+fs.writeFileSync(rootCAPath, pki.certificateToPem(caCert), 'utf8');
+
+// 4. Instalar Root CA en Windows (opcional, falla silenciosamente sin admin)
+if (process.platform === 'win32') {
+  try {
+    execSync(`certutil -addstore -f Root "${rootCAPath}"`, { stdio: 'pipe', timeout: 5000 });
+  } catch {}
+}

@@ -8,7 +8,7 @@ export const createProductSchema = z.object({
   price: z.number().positive("Precio debe ser mayor a 0"),
   cost: z.number().positive().optional().nullable(),
   bulkCost: z.number().positive().optional().nullable(),
-  stockQty: z.number().min(0).default(0),
+  stockQty: z.number().default(0),
   minStock: z.number().min(0).default(0),
   categoryId: z.number().int().positive(),
   supplierId: z.number().int().positive().optional().nullable(),

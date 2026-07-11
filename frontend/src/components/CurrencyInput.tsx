@@ -8,6 +8,7 @@ interface CurrencyInputProps {
   autoFocus?: boolean;
   className?: string;
   prefix?: boolean;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 function formatWithThousands(val: string): string {
@@ -23,7 +24,7 @@ function rawValue(formatted: string): string {
 }
 
 export function CurrencyInput({
-  value, onChange, placeholder = '0', required, autoFocus, className = '', prefix = true,
+  value, onChange, placeholder = '0', required, autoFocus, className = '', prefix = true, onKeyDown,
 }: CurrencyInputProps) {
   const [display, setDisplay] = useState(() => formatWithThousands(value));
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +51,7 @@ export function CurrencyInput({
         placeholder={placeholder}
         required={required}
         autoFocus={autoFocus}
+        onKeyDown={onKeyDown}
         className={`${prefix ? 'pl-7' : ''} ${className}`}
       />
     </div>

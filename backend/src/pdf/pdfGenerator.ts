@@ -86,17 +86,17 @@ export async function generateTicketPdf(sale: SaleForPdf): Promise<Buffer> {
       const qty = Number(item.quantity);
       const unit = item.product.saleType === "WEIGHT" ? "kg" : "uds";
       const name = item.product.name.substring(0, 20);
-      const sub = Number(item.subtotal).toFixed(2);
+      const sub = Math.round(Number(item.subtotal));
 
       doc.text(`${name}`);
-      doc.text(`  ${qty.toFixed(3)} ${unit} x $${Number(item.unitPrice).toFixed(2)} = $${sub}`);
+      doc.text(`  ${qty.toFixed(3)} ${unit} x $${Math.round(Number(item.unitPrice))} = $${sub}`);
     }
 
     doc.text("─".repeat(38), { align: "center" });
 
     // Totales
     doc.font("Helvetica-Bold");
-    doc.text(`TOTAL: $${Number(sale.total).toFixed(2)}`, { align: "right" });
+    doc.text(`TOTAL: $${Math.round(Number(sale.total))}`, { align: "right" });
     doc.font("Helvetica");
 
     const methodNames: Record<string, string> = {
@@ -105,9 +105,9 @@ export async function generateTicketPdf(sale: SaleForPdf): Promise<Buffer> {
       TRANSFER: "Transferencia",
     };
     doc.text(`Pago: ${methodNames[sale.paymentMethod] || sale.paymentMethod}`, { align: "right" });
-    doc.text(`Pagado: $${Number(sale.amountPaid).toFixed(2)}`, { align: "right" });
+    doc.text(`Pagado: $${Math.round(Number(sale.amountPaid))}`, { align: "right" });
     if (Number(sale.changeAmount) > 0) {
-      doc.text(`Cambio: $${Number(sale.changeAmount).toFixed(2)}`, { align: "right" });
+      doc.text(`Cambio: $${Math.round(Number(sale.changeAmount))}`, { align: "right" });
     }
 
     doc.moveDown(0.5);

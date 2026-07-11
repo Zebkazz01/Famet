@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { WarningCircle, Trash, Info, Check, X } from '@phosphor-icons/react';
 import { Portal } from './Portal';
 
@@ -42,6 +43,16 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   if (!open) return null;
 
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopImmediatePropagation(); onConfirm(); }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); onCancel(); }
+    };
+    document.addEventListener('keydown', handler, true);
+    return () => document.removeEventListener('keydown', handler, true);
+  }, [open, onConfirm, onCancel]);
+
   const v = variants[variant];
   const Icon = v.icon;
   const ConfirmIcon = v.confirmIcon;
@@ -70,6 +81,7 @@ export function ConfirmModal({
           </button>
           <button
             onClick={onConfirm}
+            autoFocus
             className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${v.btnClass}`}
           >
             <ConfirmIcon size={16} weight="bold" />

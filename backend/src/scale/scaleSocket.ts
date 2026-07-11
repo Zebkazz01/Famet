@@ -2,8 +2,17 @@ import { Server as SocketServer } from "socket.io";
 import { ScaleManager } from "./scaleManager";
 import { ScaleReading } from "./scaleParser";
 import { ProcessedReading } from "./scaleProcessor";
+import * as configCache from "../utils/configCache";
+import { log } from "../config/logger";
 
 export function setupScaleSocket(io: SocketServer, scaleManager: ScaleManager) {
+  const persistConfig = async () => {
+    try {
+      await configCache.set("scale_processor_config", JSON.stringify(scaleManager.getProcessorConfig()));
+    } catch (e: any) {
+      log.warn(`[scale] no se pudo persistir config: ${e.message}`);
+    }
+  };
   const scaleNamespace = io.of("/scale");
 
   // Peso crudo (sin procesar)
@@ -55,17 +64,20 @@ export function setupScaleSocket(io: SocketServer, scaleManager: ScaleManager) {
     socket.on("setUnit", (unit: string) => {
       if (["kg", "lb", "g"].includes(unit)) {
         scaleManager.setUnit(unit as "kg" | "lb" | "g");
+        persistConfig();
       }
     });
 
     socket.on("setInputUnit", (unit: string) => {
       if (["kg", "lb", "g"].includes(unit)) {
         scaleManager.setInputUnit(unit as "kg" | "lb" | "g");
+        persistConfig();
       }
     });
 
     socket.on("updateProcessorConfig", (config: any) => {
       scaleManager.updateProcessorConfig(config);
+      persistConfig();
     });
 
     socket.on("resetProcessor", () => {

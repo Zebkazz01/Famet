@@ -10,6 +10,8 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Portal } from '../components/Portal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PageSkeleton } from '../components/PageSkeleton';
+import { useEnterSubmit } from '../hooks/useEnterSubmit';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 interface FormState {
   name: string;
@@ -45,6 +47,8 @@ export function CategoriesPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+
+  useModalEscape(showForm ? () => setShowForm(false) : null);
 
   async function refresh() {
     setLoading(true);
@@ -175,6 +179,8 @@ export function CategoriesPage() {
     }
   }
 
+  useEnterSubmit(handleSave, showForm);
+
   if (loading) return <PageSkeleton type="table" />;
 
   return (
@@ -192,9 +198,16 @@ export function CategoriesPage() {
 
       <div id="categories-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {categories.length === 0 && (
-          <Card padding="md" className="col-span-full text-center text-sm text-gray-400">
-            Sin categorías. Crea la primera.
-          </Card>
+          <div className="col-span-full flex flex-col items-center justify-center py-12 px-4">
+            <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4">
+              <Folder size={32} weight="duotone" className="text-gray-400" />
+            </div>
+            <p className="font-semibold text-gray-700 dark:text-gray-200 mb-1">Aún no hay categorías</p>
+            <p className="text-sm text-gray-400 mb-4">Crea la primera categoría para organizar tus productos</p>
+            <button onClick={startNew} className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors">
+              <Plus size={16} weight="bold" /> Nueva categoría
+            </button>
+          </div>
         )}
         {categories.map((c) => (
           <Card key={c.id} padding="md" className={`relative ${!c.active ? 'opacity-50' : ''}`}>

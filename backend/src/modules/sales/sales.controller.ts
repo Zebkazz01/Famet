@@ -6,6 +6,18 @@ import { AppError } from "../../middleware/errorHandler";
 import * as expiryService from "../expiry/expiryService";
 import { evaluate as evaluateDiscounts } from "../discounts/discountEngine";
 
+/** Redondea un valor Decimal o number al peso colombiano más cercano (sin decimales) */
+function roundPeso(val: Decimal | number): Decimal {
+  const n = val instanceof Decimal ? val.toNumber() : val;
+  return new Decimal(Math.round(n));
+}
+
+/** Redondea a múltiplo de 100 (Colombia no usa monedas menores a 100) */
+function roundTo100(val: Decimal | number): Decimal {
+  const n = val instanceof Decimal ? val.toNumber() : val;
+  return new Decimal(Math.round(n / 100) * 100);
+}
+
 export async function createSale(req: Request, res: Response, next?: any) {
   try {
   const input = req.body as CreateSaleInput;
@@ -41,9 +53,9 @@ export async function createSale(req: Request, res: Response, next?: any) {
         throw new AppError(400, `Producto ID ${item.productId} no disponible`);
       }
 
-      const itemSubtotal = new Decimal(item.unitPrice).mul(item.quantity);
+      const itemSubtotal = roundPeso(new Decimal(item.unitPrice).mul(item.quantity));
       const skipDiscount = !!(item as any).skipDiscount;
-      const itemDiscount = skipDiscount ? new Decimal(0) : new Decimal(discountByProduct.get(item.productId)?.discount ?? 0);
+      const itemDiscount = skipDiscount ? new Decimal(0) : roundPeso(new Decimal(discountByProduct.get(item.productId)?.discount ?? 0));
       subtotal = subtotal.add(itemSubtotal.sub(itemDiscount));
       discountTotal = discountTotal.add(itemDiscount);
 
@@ -81,12 +93,12 @@ export async function createSale(req: Request, res: Response, next?: any) {
           notes: item.isSubUnit ? `Sub-unidad: ${item.quantity} uds` : null,
           userId,
           unitCost: product.cost ?? null,
-          totalValue: new Decimal(item.unitPrice).mul(item.quantity),
+          totalValue: roundPeso(new Decimal(item.unitPrice).mul(item.quantity)),
         } as any,
       });
     }
 
-    const total = subtotal;
+    const total = roundTo100(subtotal);
     // Crédito: validar cliente y límite. Si crédito → amountPaid puede ser 0 y no exige cambio.
     const isCredit = !!(input as any).isCredit;
     const customerId = (input as any).customerId ?? null;
@@ -96,22 +108,22 @@ export async function createSale(req: Request, res: Response, next?: any) {
       if (!customerId) throw new AppError(400, "Crédito requiere customerId");
       const customer = await tx.customer.findUnique({ where: { id: customerId } });
       if (!customer || !customer.active) throw new AppError(404, "Cliente no encontrado o inactivo");
-      const partial = new Decimal(input.amountPaid || 0);
+      const partial = roundPeso(new Decimal(input.amountPaid || 0));
       creditBalance = total.sub(partial);
       if (creditBalance.lessThanOrEqualTo(0)) {
         // No es crédito real, se pagó todo
         creditBalance = new Decimal(0);
       }
       // Validar límite
-      const newDebt = new Decimal(customer.currentDebt).add(creditBalance);
+      const newDebt = roundPeso(new Decimal(customer.currentDebt).add(creditBalance));
       if (Number(customer.creditLimit) > 0 && newDebt.greaterThan(customer.creditLimit)) {
-        throw new AppError(400, `Excede límite de crédito (${customer.creditLimit}) — deuda total quedaría en ${newDebt.toFixed(2)}`);
+        throw new AppError(400, `Excede límite de crédito (${customer.creditLimit}) — deuda total quedaría en ${newDebt.toFixed(0)}`);
       }
     }
 
     const changeAmount = isCredit
       ? new Decimal(0)
-      : new Decimal(input.amountPaid).sub(total);
+      : roundPeso(new Decimal(input.amountPaid).sub(total));
 
     if (!isCredit && changeAmount.lessThan(0)) {
       throw new AppError(400, "Monto pagado insuficiente");
@@ -123,9 +135,9 @@ export async function createSale(req: Request, res: Response, next?: any) {
         userId,
         subtotal,
         total,
-        discountTotal,
+        discountTotal: roundPeso(discountTotal),
         paymentMethod: input.paymentMethod,
-        amountPaid: input.amountPaid,
+        amountPaid: roundPeso(new Decimal(input.amountPaid)),
         changeAmount,
         paymentRef: (input as any).paymentRef ?? null,
         paymentEvidence: (input as any).paymentEvidence ?? null,
@@ -133,7 +145,7 @@ export async function createSale(req: Request, res: Response, next?: any) {
         paymentNotes: (input as any).paymentNotes ?? null,
         isCredit,
         customerId,
-        creditBalance,
+        creditBalance: roundPeso(creditBalance),
         dueDate: (input as any).dueDate ? new Date((input as any).dueDate) : null,
         items: {
           create: input.items.map((item) => {
@@ -144,7 +156,7 @@ export async function createSale(req: Request, res: Response, next?: any) {
               productId: item.productId,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
-              subtotal: gross.sub(disc),
+              subtotal: roundPeso(gross.sub(disc)),
               isSubUnit: item.isSubUnit || false,
               discountAmount: disc,
               discountRuleId: itemDiscount?.ruleId ?? null,
@@ -203,14 +215,23 @@ export async function createSale(req: Request, res: Response, next?: any) {
   }
 }
 
+function parseDateParam(value: string, endOfDay: boolean): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split("-").map(Number);
+    if (endOfDay) return new Date(y, m - 1, d, 23, 59, 59, 999);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(value);
+}
+
 export async function getSales(req: Request, res: Response) {
   const { from, to, limit } = req.query;
 
   const where: any = {};
   if (from || to) {
     where.createdAt = {};
-    if (from) where.createdAt.gte = new Date(String(from));
-    if (to) where.createdAt.lte = new Date(String(to) + "T23:59:59");
+    if (from) where.createdAt.gte = parseDateParam(String(from), false);
+    if (to) where.createdAt.lte = parseDateParam(String(to), true);
   }
 
   // VENDEDOR solo ve sus propias ventas
@@ -223,12 +244,18 @@ export async function getSales(req: Request, res: Response) {
     include: {
       user: { select: { firstName: true, lastName: true } },
       customer: { select: { id: true, name: true } },
+      items: { select: { product: { select: { name: true } } } },
       _count: { select: { items: true } },
     },
     orderBy: { createdAt: "desc" },
     take: limit ? Number(limit) : 50,
   });
-  return res.json(sales);
+
+  const result = sales.map((sale) => ({
+    ...sale,
+    productNames: [...new Set(sale.items.map((i: any) => i.product.name))].join(", "),
+  }));
+  return res.json(result);
 }
 
 export async function getSale(req: Request, res: Response) {
@@ -247,8 +274,8 @@ export async function getSale(req: Request, res: Response) {
 
 export async function getDailySummary(req: Request, res: Response) {
   const date = req.query.date ? String(req.query.date) : new Date().toISOString().split("T")[0];
-  const startOfDay = new Date(date + "T00:00:00");
-  const endOfDay = new Date(date + "T23:59:59");
+  const startOfDay = parseDateParam(date, false);
+  const endOfDay = parseDateParam(date, true);
 
   const sales = await prisma.sale.findMany({
     where: { createdAt: { gte: startOfDay, lte: endOfDay } },
@@ -333,6 +360,69 @@ export async function correctSale(req: Request, res: Response) {
   return res.json(updated);
 }
 
+export async function deleteSale(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const userId = req.user!.userId;
+
+  const existing = await prisma.sale.findUnique({
+    where: { id },
+    include: { items: { include: { product: true } } },
+  });
+  if (!existing) return res.status(404).json({ error: "Venta no encontrada" });
+
+  await prisma.$transaction(async (tx) => {
+    if (!existing.corrected) {
+      // Venta activa: restaurar stock y registrar devolución
+      for (const item of existing.items) {
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!product) continue;
+        let stockReturn: Decimal;
+        if (item.isSubUnit && product.unitsPerPack) {
+          stockReturn = item.quantity.div(product.unitsPerPack);
+        } else {
+          stockReturn = item.quantity;
+        }
+        const restoredQty = product.stockQty.add(stockReturn);
+        await tx.product.update({ where: { id: product.id }, data: { stockQty: restoredQty } });
+        await tx.inventoryMovement.create({
+          data: {
+            productId: product.id, type: "RETURN", quantity: stockReturn,
+            previousQty: product.stockQty, newQty: restoredQty,
+            notes: `Eliminación venta #${id}`,
+          },
+        });
+      }
+      if (existing.paymentMethod === "CASH" && Number(existing.total) > 0) {
+        await tx.cashMovement.create({
+          data: {
+            type: "CASH_OUT",
+            amount: roundPeso(existing.total),
+            reason: `Devolución venta #${id}: Eliminada por administrador`,
+            userId,
+          },
+        });
+      }
+    }
+
+    await tx.saleItem.deleteMany({ where: { saleId: id } });
+    await tx.sale.delete({ where: { id } });
+  });
+
+  try {
+    const notificationService = await import("../notifications/notificationService");
+    await notificationService.create({
+      type: "WARNING",
+      role: "ADMIN",
+      title: "Venta eliminada",
+      message: `Venta #${id} fue eliminada por administrador`,
+      link: `/sales`,
+      metadata: { saleId: id, deletedBy: userId } as any,
+    });
+  } catch {/* nop */}
+
+  return res.json({ message: "Venta eliminada exitosamente" });
+}
+
 export async function updateSale(req: Request, res: Response) {
   const id = Number(req.params.id);
   const input = req.body as CreateSaleInput & { correctionReason?: string };
@@ -376,7 +466,7 @@ export async function updateSale(req: Request, res: Response) {
       if (!product || !product.active) {
         throw new AppError(400, `Producto ID ${item.productId} no disponible`);
       }
-      const itemSubtotal = new Decimal(item.unitPrice).mul(item.quantity);
+      const itemSubtotal = roundPeso(new Decimal(item.unitPrice).mul(item.quantity));
       subtotal = subtotal.add(itemSubtotal);
 
       let stockDecrement: Decimal;
@@ -413,7 +503,7 @@ export async function updateSale(req: Request, res: Response) {
     }
 
     // 5. Actualizar venta
-    const total = subtotal;
+    const total = roundTo100(subtotal);
     const updated = await tx.sale.update({
       where: { id },
       data: {
@@ -429,7 +519,7 @@ export async function updateSale(req: Request, res: Response) {
             productId: item.productId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            subtotal: new Decimal(item.unitPrice).mul(item.quantity),
+            subtotal: roundPeso(new Decimal(item.unitPrice).mul(item.quantity)),
             isSubUnit: item.isSubUnit || false,
           })),
         },

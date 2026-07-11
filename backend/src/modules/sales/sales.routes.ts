@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticate, authorize } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { createSaleSchema, correctSaleSchema, updateSaleSchema } from "./sales.schema";
-import { createSale, getSales, getSale, getDailySummary, correctSale, updateSale } from "./sales.controller";
+import { createSale, getSales, getSale, getDailySummary, correctSale, updateSale, deleteSale } from "./sales.controller";
 
 const router = Router();
 
@@ -12,5 +12,6 @@ router.get("/", authenticate, getSales);
 router.get("/summary", authenticate, authorize("ADMIN", "SUPERVISOR"), getDailySummary);
 router.get("/:id", authenticate, getSale);
 router.patch("/:id/correct", authenticate, validate(correctSaleSchema), correctSale);
+router.delete("/:id", authenticate, authorize("ADMIN"), deleteSale);
 
 export default router;
