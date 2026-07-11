@@ -11,8 +11,10 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { Portal } from '../components/Portal';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { useEnterSubmit } from '../hooks/useEnterSubmit';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 interface PageFilters extends Record<string, any> {
   q: string;
@@ -59,6 +61,9 @@ export function ExpensesPage() {
   const [saving, setSaving] = useState(false);
   const [viewEvidence, setViewEvidence] = useState<Expense | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+
+  useModalEscape(showForm ? () => setShowForm(false) : null);
+  useModalEscape(viewEvidence ? () => setViewEvidence(null) : null);
 
   const { filters, setFilter, clear, activeCount } = useTableFilters<PageFilters>({
     q: '',
@@ -183,6 +188,8 @@ export function ExpensesPage() {
     return [{ value: '', label: 'Todas las categorías' }, ...Array.from(set).sort().map((c) => ({ value: c, label: c }))];
   }, [expenses]);
 
+  useEnterSubmit(handleSave, showForm);
+
   return (
     <div className="flex-1 overflow-auto styled-scroll p-4 md:p-6 space-y-4">
       <PageHeader
@@ -243,7 +250,7 @@ export function ExpensesPage() {
       </div>
 
       {/* Filtros */}
-      <FilterPanel storageKey="expenses"
+      <FilterPanel storageKey="expenses" toggleOnEvent="fameat:toggle-filters"
         activeCount={activeCount}
         onClear={clear}
         chips={[
@@ -258,6 +265,7 @@ export function ExpensesPage() {
           value={filters.q}
           onChange={(e) => setFilter('q', e.target.value)}
           prefix={<MagnifyingGlass size={14} />}
+          data-search-input=""
         />
         <Combobox
           label="Categoría"
@@ -307,8 +315,25 @@ export function ExpensesPage() {
               )}
               {!loading && expenses.length === 0 && (
                 <tr><td colSpan={7} className="py-12 text-center">
-                  <Receipt size={36} weight="duotone" className="text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-400">Sin gastos en el periodo</p>
+                  {filters.q || filters.category || filters.from || filters.to ? (
+                    <>
+                      <MagnifyingGlass size={36} weight="duotone" className="text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-400 font-medium mb-1">Sin resultados</p>
+                      <p className="text-xs text-gray-400 mb-3">No hay gastos que coincidan con los filtros</p>
+                      <button onClick={clear} className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-medium hover:bg-gray-200">
+                        <X size={12} weight="bold" /> Limpiar filtros
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Receipt size={36} weight="duotone" className="text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-400 font-medium mb-1">Aún no hay gastos</p>
+                      <p className="text-xs text-gray-400 mb-3">Registra el primer gasto para llevar el control</p>
+                      <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">
+                        <Plus size={12} weight="bold" /> Nuevo gasto
+                      </button>
+                    </>
+                  )}
                 </td></tr>
               )}
               {sortedExpenses.map((e) => (

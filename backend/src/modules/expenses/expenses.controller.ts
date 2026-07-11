@@ -3,13 +3,22 @@ import { prisma } from "../../config/database";
 import { Prisma } from "@prisma/client";
 import { createExpenseSchema, updateExpenseSchema } from "./expenses.schema";
 
+function parseDateParam(value: string, endOfDay: boolean): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split("-").map(Number);
+    if (endOfDay) return new Date(y, m - 1, d, 23, 59, 59, 999);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(value);
+}
+
 export async function listExpenses(req: Request, res: Response) {
   const { from, to, category, userId, q } = req.query;
   const where: Prisma.ExpenseWhereInput = {};
   if (from || to) {
     where.date = {};
-    if (from) (where.date as any).gte = new Date(String(from));
-    if (to) (where.date as any).lte = new Date(String(to) + "T23:59:59");
+    if (from) (where.date as any).gte = parseDateParam(String(from), false);
+    if (to) (where.date as any).lte = parseDateParam(String(to), true);
   }
   if (category) where.category = String(category);
   if (userId) where.userId = Number(userId);

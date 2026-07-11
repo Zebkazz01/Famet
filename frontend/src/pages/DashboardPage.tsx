@@ -11,6 +11,8 @@ import {
   CalendarBlank, WarningCircle, UserCircle,
 } from '@phosphor-icons/react';
 import { PageHeader } from '../components/layout/PageHeader';
+import { getSummary } from '../api/processing';
+import type { DashboardSummary } from '../api/processing';
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function daysAgoISO(n: number) {
@@ -56,6 +58,9 @@ export function DashboardPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [showCustom, setShowCustom] = useState(false);
+  const [processing, setProcessing] = useState<DashboardSummary | null>(null);
+
+  useEffect(() => { getSummary().then(setProcessing).catch(() => {}); }, []);
 
   useEffect(() => {
     setLoadError(null);
@@ -293,6 +298,17 @@ export function DashboardPage() {
         <KPICard icon={<ShoppingBag size={20} weight="duotone" />} label="Ventas" value={String(data.totals.salesCount)} color="red" />
         <KPICard icon={<ChartBar size={20} weight="duotone" />} label="Ticket promedio" value={formatCurrency(data.totals.avgTicket)} color="purple" />
       </div>
+
+      {/* Procesamiento / Desposte */}
+      {processing && (
+        <div id="dashboard-processing" className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <KPICard icon={<TrendUp size={20} weight="duotone" />} label="Lotes completados" value={String(processing.activeBatches)} color="blue" sub={processing.month} />
+          <KPICard icon={<CurrencyDollar size={20} weight="duotone" />} label="Invertido" value={formatCurrency(processing.totalInvested)} color="red" />
+          <KPICard icon={<ChartBar size={20} weight="duotone" />} label="Peso obtenido" value={`${processing.totalOutputWeight.toFixed(1)} kg`} color="green" />
+          <KPICard icon={<Receipt size={20} weight="duotone" />} label="Recuperado (costo)" value={formatCurrency(processing.totalRecoveredCost)} sub={`${processing.recoveryPct}%`} color="amber" />
+          <KPICard icon={<WarningCircle size={20} weight="duotone" />} label="Pte. recuperar" value={formatCurrency(processing.pendingRecovery)} color="purple" />
+        </div>
+      )}
 
       {/* Crédito / Fiado */}
       {data.creditSummary && (

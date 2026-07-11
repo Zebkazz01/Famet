@@ -1,3 +1,8 @@
+/** Redondea al múltiplo de 100 más cercano (Colombia no usa monedas menores a 100) */
+export function roundTo100(val: number): number {
+  return Math.round(val / 100) * 100;
+}
+
 export function formatCurrency(amount: number | string): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   return new Intl.NumberFormat('es-CO', {

@@ -40,7 +40,8 @@ export const COMMANDS: Command[] = [
   { id: 'customers', label: 'Clientes', keywords: ['cliente', 'customer', 'credito', 'deuda', 'abono', 'descuento'], section: 'module', route: '/customers', icon: UsersThree, roles: ['ADMIN', 'SUPERVISOR', 'VENDEDOR'] },
   { id: 'suppliers', label: 'Proveedores', keywords: ['proveedor', 'compras', 'distribuidor', 'vendor'], section: 'module', route: '/suppliers', icon: Truck, roles: ['ADMIN', 'SUPERVISOR'] },
   { id: 'purchase-orders', label: 'Órdenes de Compra', keywords: ['orden', 'compra', 'pedido', 'proveedor', 'recepcion', 'po'], section: 'module', route: '/purchase-orders', icon: ClipboardTextIcon, roles: ['ADMIN', 'SUPERVISOR'] },
-  { id: 'expenses', label: 'Gastos', keywords: ['expense', 'egresos', 'compras', 'pagos', 'gasto'], section: 'module', route: '/expenses', icon: Receipt, roles: ['ADMIN', 'SUPERVISOR'] },
+  { id: 'processing', label: 'Procesamiento / Desposte', keywords: ['procesamiento', 'desposte', 'corte', 'carne', 'res', 'cerdo', 'animal', 'procesar'], section: 'module', route: '/processing', icon: ClipboardTextIcon, roles: ['ADMIN', 'SUPERVISOR'] },
+  { id: 'expenses', label: 'Gastos', keywords: ['expense', 'egresos', 'compras', 'pagos', 'gasto'], section: 'module', route: '/expenses', icon: Receipt, roles: ['ADMIN', 'SUPERVISOR', 'VENDEDOR'] },
   { id: 'reports', label: 'Reportes', keywords: ['reporte', 'pdf', 'excel', 'estado de resultados', 'analytics'], section: 'module', route: '/reports', icon: ChartPieSlice, roles: ['ADMIN', 'SUPERVISOR'] },
   { id: 'notifications', label: 'Notificaciones', keywords: ['alertas', 'avisos', 'campana', 'mensajes', 'bell'], section: 'module', route: '/notifications', icon: Bell, roles: ['ADMIN', 'SUPERVISOR', 'VENDEDOR'] },
   { id: 'backups', label: 'Backups', keywords: ['backup', 'respaldo', 'copia', 'restaurar', 'database', 'bd'], section: 'module', route: '/backups', icon: Database, roles: ['ADMIN'] },
@@ -72,7 +73,7 @@ export const COMMANDS: Command[] = [
 
   // ====== Acciones rápidas — Proveedores / Gastos ======
   { id: 'supplier-new', label: 'Crear proveedor', keywords: ['nuevo', 'proveedor', 'agregar'], section: 'action', route: '/suppliers', query: 'new=1', icon: Plus, roles: ['ADMIN', 'SUPERVISOR'] },
-  { id: 'expense-new', label: 'Registrar gasto', keywords: ['nuevo', 'gasto', 'agregar', 'compra'], section: 'action', route: '/expenses', query: 'new=1', icon: Plus, roles: ['ADMIN', 'SUPERVISOR'] },
+  { id: 'expense-new', label: 'Registrar gasto', keywords: ['nuevo', 'gasto', 'agregar', 'compra'], section: 'action', route: '/expenses', query: 'new=1', icon: Plus, roles: ['ADMIN', 'SUPERVISOR', 'VENDEDOR'] },
   { id: 'purchase-order-new', label: 'Crear orden de compra', keywords: ['nueva', 'orden', 'compra', 'pedido', 'proveedor'], section: 'action', route: '/purchase-orders', query: 'new=1', icon: Plus, roles: ['ADMIN', 'SUPERVISOR'] },
 
   // ====== Acciones rápidas — Backups ======

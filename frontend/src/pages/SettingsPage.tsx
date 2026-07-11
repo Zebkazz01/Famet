@@ -11,6 +11,7 @@ import type { WeightUnit } from '../contexts/ScaleContext';
 import { Input, Button } from '../components/ui';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Portal } from '../components/Portal';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 interface Port {
   path: string;
@@ -46,6 +47,8 @@ export function SettingsPage() {
     stabilityTolerance: '0.002',
     averageSamples: '3',
   });
+
+  useModalEscape(logoLightbox ? () => setLogoLightbox(false) : null);
 
   useEffect(() => {
     client.get('/config').then((r) => {

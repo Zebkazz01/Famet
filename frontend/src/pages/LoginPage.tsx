@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSystemDiagnostic } from '../hooks/useSystemDiagnostic';
 import { useConfig } from '../contexts/ConfigContext';
 import { GlobalFooter } from '../components/layout/GlobalFooter';
+import { NetworkInfo } from '../components/NetworkInfo';
 
 export function LoginPage() {
   const [username, setUsername] = useState('');
@@ -86,6 +87,8 @@ export function LoginPage() {
         <p className="text-xs text-gray-400 text-center mt-4">
           admin / admin123 | supervisor1 / super123 | cajero1 / cajero123
         </p>
+
+        <NetworkInfo />
       </div>
       <GlobalFooter />
     </div>

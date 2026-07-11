@@ -3,8 +3,10 @@ import client from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 import toast from 'react-hot-toast';
-import { CurrencyDollar, Plus, Vault, X, ArrowDown, ArrowUp, Wallet, Funnel, SortAscending } from '@phosphor-icons/react';
+import { CurrencyDollar, Plus, Vault, X, ArrowDown, ArrowUp, Wallet, Funnel, SortAscending, Trash, Eye } from '@phosphor-icons/react';
+
 import { Portal } from '../components/Portal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { CurrencyInput } from '../components/CurrencyInput';
 import { StatsCards } from '../components/StatsCards';
 import { PageSkeleton } from '../components/PageSkeleton';
@@ -12,7 +14,9 @@ import { ErrorView } from '../components/ErrorBoundary';
 import { ViewToggle } from '../components/ViewToggle';
 import { FilterPanel, DatePicker, Select } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
+import { useEnterSubmit } from '../hooks/useEnterSubmit';
 import { PageHeader } from '../components/layout/PageHeader';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 interface CashMovement {
   id: number;
@@ -63,6 +67,15 @@ export function CashPage() {
   const [actualAmount, setActualAmount] = useState('');
   const [closeNotes, setCloseNotes] = useState('');
 
+  const [detailMovement, setDetailMovement] = useState<CashMovement | null>(null);
+  const [confirmDeleteMov, setConfirmDeleteMov] = useState<number | null>(null);
+  const [confirmDeleteClosing, setConfirmDeleteClosing] = useState<number | null>(null);
+
+  useModalEscape(showMovForm ? () => setShowMovForm(false) : null);
+  useModalEscape(showOpeningForm ? () => setShowOpeningForm(false) : null);
+  useModalEscape(showCloseForm ? () => setShowCloseForm(false) : null);
+  useModalEscape(detailMovement ? () => setDetailMovement(null) : null);
+
   const { filters: cFilters, setFilter: setCFilter, clear: clearCFilters, activeCount: cActiveCount } = useTableFilters<{ type: string; sort: string }>({ type: '', sort: 'recent' });
 
   const loadMovements = () =>
@@ -74,6 +87,33 @@ export function CashPage() {
     client.get(`/cash/closings?from=${date}&to=${date}`)
       .then((r) => setClosings(r.data))
       .catch(() => {});
+
+  const handleDeleteMovement = async () => {
+    if (!confirmDeleteMov) return;
+    try {
+      await client.delete(`/cash/movement/${confirmDeleteMov}`);
+      toast.success('Movimiento eliminado permanentemente');
+      setDetailMovement(null);
+      setConfirmDeleteMov(null);
+      loadMovements();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al eliminar movimiento');
+      setConfirmDeleteMov(null);
+    }
+  };
+
+  const handleDeleteClosing = async () => {
+    if (!confirmDeleteClosing) return;
+    try {
+      await client.delete(`/cash/closing/${confirmDeleteClosing}`);
+      toast.success('Cierre eliminado permanentemente');
+      setConfirmDeleteClosing(null);
+      loadClosings();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al eliminar cierre');
+      setConfirmDeleteClosing(null);
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -130,6 +170,8 @@ export function CashPage() {
   };
 
   const difference = expectedAmount && actualAmount ? parseFloat(actualAmount) - parseFloat(expectedAmount) : 0;
+
+  useEnterSubmit(submitMovement, showMovForm);
 
   if (loading) return <PageSkeleton type="table" />;
   if (loadError) return <ErrorView error={loadError} onRetry={() => window.location.reload()} />;
@@ -230,6 +272,12 @@ export function CashPage() {
                   {m.type === 'CASH_IN' ? 'Entrada' : 'Salida'}
                 </span>
               )}
+              cardActions={(m) => (
+                <button onClick={() => setDetailMovement(m)}
+                  className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-700 text-xs font-medium">
+                  <Eye size={14} weight="duotone" /> Detalle
+                </button>
+              )}
               columns={[
                 { key: 'date', label: 'Hora', render: (m) => formatDateTime(m.createdAt), cardHidden: true },
                 { key: 'type', label: 'Tipo', render: (m) => (
@@ -276,6 +324,12 @@ export function CashPage() {
                   {diff >= 0 ? '+' : ''}{formatCurrency(c.difference)}
                 </span>;
               }}
+              cardActions={(c) => hasRole('ADMIN') ? (
+                <button onClick={() => setConfirmDeleteClosing(c.id)}
+                  className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium">
+                  <Trash size={14} weight="duotone" /> Eliminar
+                </button>
+              ) : null}
               columns={[
                 { key: 'date', label: 'Fecha', render: (c) => formatDateTime(c.createdAt), cardHidden: true },
                 { key: 'expected', label: 'Esperado', render: (c) => formatCurrency(c.expectedAmount) },
@@ -285,7 +339,12 @@ export function CashPage() {
                   return <span className={`font-bold ${diff >= 0 ? 'text-green-600' : 'text-red-500'}`}>{diff >= 0 ? '+' : ''}{formatCurrency(c.difference)}</span>;
                 }, cardHidden: true },
                 { key: 'notes', label: 'Notas', render: (c) => <span className="text-gray-500">{c.notes || '-'}</span> },
-                { key: 'user', label: 'Responsable', render: (c) => `${c.user.firstName} ${c.user.lastName}`, cardHidden: true },
+                { key: 'actions', label: 'Acciones', render: (c) => hasRole('ADMIN') ? (
+                  <button onClick={() => setConfirmDeleteClosing(c.id)}
+                    className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium">
+                    <Trash size={14} weight="duotone" /> Eliminar
+                  </button>
+                ) : null, cardHidden: true },
               ]}
               emptyMessage="Sin cierres de caja"
               onCreateNew={() => setShowCloseForm(true)}
@@ -398,6 +457,79 @@ export function CashPage() {
           </div>
         </div>
       </Portal>)}
+
+      {/* Modal detalle movimiento */}
+      {detailMovement && (<Portal>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={() => setDetailMovement(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-bold text-lg">Detalle del movimiento</h3>
+              <button onClick={() => setDetailMovement(null)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <X size={18} weight="bold" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                <span className="text-sm text-gray-500">Tipo</span>
+                <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${detailMovement.type === 'CASH_IN' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {detailMovement.type === 'CASH_IN' ? 'Entrada' : 'Salida'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                <span className="text-sm text-gray-500">Monto</span>
+                <span className={`text-lg font-bold ${detailMovement.type === 'CASH_IN' ? 'text-green-600' : 'text-red-500'}`}>
+                  {detailMovement.type === 'CASH_IN' ? '+' : '-'}{formatCurrency(detailMovement.amount)}
+                </span>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-0.5">Motivo</p>
+                <p className="text-sm font-medium">{detailMovement.reason}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-0.5">Registrado por</p>
+                <p className="text-sm font-medium">{detailMovement.user.firstName} {detailMovement.user.lastName}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-0.5">Fecha</p>
+                <p className="text-sm font-medium">{formatDateTime(detailMovement.createdAt)}</p>
+              </div>
+            </div>
+            <div className="px-4 pb-4 flex gap-2">
+              {hasRole('ADMIN') && (
+                <button
+                  onClick={() => setConfirmDeleteMov(detailMovement.id)}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium transition-colors"
+                >
+                  <Trash size={16} weight="duotone" /> Eliminar movimiento
+                </button>
+              )}
+              <button onClick={() => setDetailMovement(null)}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </Portal>)}
+
+      <ConfirmModal
+        open={confirmDeleteMov !== null}
+        title="Eliminar movimiento"
+        message="Este movimiento se eliminará permanentemente de la base de datos. ¿Estás seguro?"
+        variant="danger"
+        confirmText="Eliminar"
+        onConfirm={handleDeleteMovement}
+        onCancel={() => setConfirmDeleteMov(null)}
+      />
+      <ConfirmModal
+        open={confirmDeleteClosing !== null}
+        title="Eliminar cierre"
+        message="Este cierre de caja se eliminará permanentemente de la base de datos. ¿Estás seguro?"
+        variant="danger"
+        confirmText="Eliminar"
+        onConfirm={handleDeleteClosing}
+        onCancel={() => setConfirmDeleteClosing(null)}
+      />
     </div>
   );
 }

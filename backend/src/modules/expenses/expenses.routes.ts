@@ -36,11 +36,11 @@ const upload = multer({
   },
 });
 
-router.get("/summary", authenticate, authorize("ADMIN", "SUPERVISOR"), summary);
-router.get("/", authenticate, authorize("ADMIN", "SUPERVISOR"), listExpenses);
-router.get("/:id", authenticate, authorize("ADMIN", "SUPERVISOR"), getExpense);
-router.post("/", authenticate, authorize("ADMIN", "SUPERVISOR"), upload.single("evidence"), createExpense);
-router.put("/:id", authenticate, authorize("ADMIN", "SUPERVISOR"), upload.single("evidence"), updateExpense);
+router.get("/summary", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), summary);
+router.get("/", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), listExpenses);
+router.get("/:id", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), getExpense);
+router.post("/", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), upload.single("evidence"), createExpense);
+router.put("/:id", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), upload.single("evidence"), updateExpense);
 router.delete("/:id", authenticate, authorize("ADMIN"), deleteExpense);
 
 export default router;

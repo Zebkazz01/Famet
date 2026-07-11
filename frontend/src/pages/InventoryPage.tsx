@@ -4,7 +4,7 @@ import client from '../api/client';
 import { formatDateTime, formatQty } from '../utils/formatters';
 import toast from 'react-hot-toast';
 import { MOVEMENT_TYPES } from '../utils/constants';
-import { ClipboardText, Plus, X, Eye, ArrowSquareOut, ArrowDown as ArrowDownIcon, ArrowUp as ArrowUpIcon, WarningCircle, Swap, Barcode, Funnel, Package as PackageIcon, SortAscending, CurrencyDollar } from '@phosphor-icons/react';
+import { ClipboardText, Plus, X, Eye, ArrowSquareOut, ArrowDown as ArrowDownIcon, ArrowUp as ArrowUpIcon, WarningCircle, Swap, Barcode, Funnel, Package as PackageIcon, SortAscending, CurrencyDollar, Scales } from '@phosphor-icons/react';
 import { StatsCards } from '../components/StatsCards';
 import { PageSkeleton } from '../components/PageSkeleton';
 import { ErrorView } from '../components/ErrorBoundary';
@@ -17,6 +17,9 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { BarcodeConflictModal } from '../components/inventory/BarcodeConflictModal';
 import { FilterPanel, Select, Combobox, Input, Textarea, Button, DateRangePicker } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
+import { useEnterSubmit } from '../hooks/useEnterSubmit';
+import { useScale } from '../contexts/ScaleContext';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 interface Product {
   id: number;
@@ -43,6 +46,7 @@ interface Movement {
 
 export function InventoryPage() {
   const navigate = useNavigate();
+  const { weight, stable, connected, unit } = useScale();
   const [movements, setMovements] = useState<Movement[]>([]);
   const [alerts, setAlerts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -54,6 +58,10 @@ export function InventoryPage() {
   const [showScanner, setShowScanner] = useState(false);
   const barcodeResolver = useBarcodeResolver();
   const [showConflict, setShowConflict] = useState(false);
+  useModalEscape(showForm ? () => setShowForm(false) : null);
+  useModalEscape(detail ? () => setDetail(null) : null);
+  useModalEscape(showScanner ? () => setShowScanner(false) : null);
+  useModalEscape(showConflict ? () => setShowConflict(false) : null);
   const { filters: iFilters, setFilter: setIFilter, clear: clearIFilters, activeCount: iActiveCount } = useTableFilters<{ type: string; productId: string; sort: string; range: { from?: string; to?: string } }>({ type: '', productId: '', sort: 'recent', range: { from: '', to: '' } });
   const [tab, setTabState] = useState<'movements' | 'alerts'>(() => {
     const saved = localStorage.getItem('fameat-inventory-tab');
@@ -149,8 +157,8 @@ export function InventoryPage() {
     navigate('/products?new=1');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     try {
       await client.post('/inventory/movements', {
         productId: parseInt(form.productId),
@@ -167,6 +175,8 @@ export function InventoryPage() {
       toast.error(err.response?.data?.error || 'Error');
     }
   };
+
+  useEnterSubmit(() => { handleSubmit(); }, showForm);
 
   if (loading) return <PageSkeleton type="table" />;
   if (loadError) return <ErrorView error={loadError} onRetry={() => window.location.reload()} />;
@@ -247,7 +257,7 @@ export function InventoryPage() {
       {tab === 'movements' && (
         <>
         <div className="mb-4">
-          <FilterPanel storageKey="inventory"
+          <FilterPanel storageKey="inventory" toggleOnEvent="fameat:toggle-filters"
             activeCount={iActiveCount}
             onClear={clearIFilters}
             chips={[
@@ -277,7 +287,7 @@ export function InventoryPage() {
           </FilterPanel>
         </div>
         <div id="inventory-list" className="bg-white rounded-xl shadow p-4">
-          <ViewToggle storageKey="inventory"
+          <ViewToggle storageKey="inventory" searchInputProps={{ 'data-search-input': '' }}
             data={movements.filter((m) => {
               if (iFilters.type && m.type !== iFilters.type) return false;
               if (iFilters.productId && !m.product.name.toLowerCase().includes((products.find((p) => String(p.id) === iFilters.productId)?.name || '').toLowerCase())) return false;
@@ -332,7 +342,7 @@ export function InventoryPage() {
 
       {tab === 'alerts' && (
         <div className="bg-white rounded-xl shadow p-4">
-          <ViewToggle storageKey="inventory"
+          <ViewToggle storageKey="inventory" searchInputProps={{ 'data-search-input': '' }}
             data={alerts}
             keyField="id"
             searchFilter={(p, q) => p.name.toLowerCase().includes(q)}
@@ -527,16 +537,39 @@ export function InventoryPage() {
                   { value: 'LOSS', label: '✗ Merma (resta stock)' },
                 ]}
               />
-              <Input
-                label="Cantidad *"
-                type="number"
-                step="0.001"
-                min="0"
-                value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                placeholder="0"
-                hint={form.productId ? `Stock actual: ${formatQty(products.find((p) => String(p.id) === form.productId)?.stockQty || '0')}` : ''}
-              />
+              <div>
+                <Input
+                  label="Cantidad *"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={form.quantity}
+                  onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+                  placeholder="0"
+                  hint={form.productId ? `Stock actual: ${formatQty(products.find((p) => String(p.id) === form.productId)?.stockQty || '0')}` : ''}
+                />
+                {form.productId && (() => {
+                  const p = products.find((pp) => String(pp.id) === form.productId);
+                  if (!p || (p.saleType !== 'WEIGHT' && p.saleType !== 'BOTH')) return null;
+                  return connected ? (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className={`text-xs font-mono font-medium ${stable ? 'text-blue-600' : 'text-yellow-600'}`}>
+                        <Scales size={12} className="inline mr-0.5" />
+                        Balanza: {weight.toFixed(3)} {unit || 'kg'}
+                      </span>
+                      {stable && weight > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, quantity: weight.toFixed(3) })}
+                          className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg hover:bg-blue-200 font-medium transition-colors"
+                        >
+                          Usar este peso
+                        </button>
+                      )}
+                    </div>
+                  ) : null;
+                })()}
+              </div>
               <Textarea
                 label="Notas"
                 rows={2}

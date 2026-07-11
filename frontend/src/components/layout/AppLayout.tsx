@@ -1,10 +1,57 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useTheme } from '../../contexts/ThemeContext';
+import { usePanel } from '../../contexts/PanelContext';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 export function AppLayout() {
   const location = useLocation();
   const { isDark } = useTheme();
+  const { toggleCart } = usePanel();
+  const isPOS = location.pathname === '/';
+
+  useKeyboardShortcuts([
+    {
+      key: '/',
+      handler: () => {
+        if (isPOS) {
+          document.getElementById('pos-search-input')?.focus();
+        } else {
+          document.querySelector<HTMLElement>('[data-search-input]')?.focus();
+        }
+      },
+    },
+    {
+      key: 'B', alt: true, allowInInput: true,
+      handler: () => {
+        if (isPOS) {
+          document.getElementById('pos-search-input')?.focus();
+        } else {
+          document.querySelector<HTMLElement>('[data-search-input]')?.focus();
+        }
+      },
+    },
+    {
+      key: ';',
+      handler: () => {
+        if (isPOS) {
+          toggleCart();
+        } else {
+          window.dispatchEvent(new CustomEvent('fameat:toggle-filters'));
+        }
+      },
+    },
+    {
+      key: 'C', alt: true, allowInInput: true,
+      handler: () => {
+        if (isPOS) {
+          toggleCart();
+        } else {
+          window.dispatchEvent(new CustomEvent('fameat:toggle-filters'));
+        }
+      },
+    },
+  ],);
   return (
     <div className={`flex flex-1 h-full relative ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
       <div className="relative z-10 flex flex-1 min-w-0">

@@ -138,15 +138,13 @@ export function GlobalHeader() {
         </span>
       </div>
 
-      {/* Centro: buscador global (desktop ancho completo) */}
-      <div className="hidden md:flex flex-1 justify-center px-4">
+      {/* Centro: buscador global */}
+      <div className="flex-1 flex justify-center px-4">
         <ModuleSearch />
       </div>
 
       {/* Derecha: carrito + acciones */}
       <div className="flex items-center gap-1">
-        {/* Buscador mobile: icono junto a otros iconos */}
-        <div className="md:hidden"><ModuleSearch /></div>
         {user && (isPOS || cartCount > 0) && (
           <span id="header-cart-btn"><HeaderButton light={light} active={cartOpen} onClick={() => {
             if (!isPOS) {

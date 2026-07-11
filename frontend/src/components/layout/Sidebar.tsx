@@ -29,6 +29,8 @@ import {
   Database,
 } from '@phosphor-icons/react';
 import type { ComponentType } from 'react';
+import { getOne as getPref } from '../../api/preferences';
+import client from '../../api/client';
 
 interface NavItem {
   to: string;
@@ -48,9 +50,10 @@ const navItems: NavItem[] = [
   { to: '/customers', label: 'Clientes', Icon: UsersThree, roles: ['ADMIN', 'SUPERVISOR', 'VENDEDOR'] },
   { to: '/suppliers', label: 'Proveedores', Icon: Truck, roles: ['ADMIN', 'SUPERVISOR'] },
   { to: '/purchase-orders', label: 'Órdenes Compra', Icon: ClipboardTextIcon, roles: ['ADMIN', 'SUPERVISOR'] },
-  { to: '/expenses', label: 'Gastos', Icon: Receipt, roles: ['ADMIN', 'SUPERVISOR'] },
+  { to: '/expenses', label: 'Gastos', Icon: Receipt, roles: ['ADMIN', 'SUPERVISOR', 'VENDEDOR'] },
   { to: '/reports', label: 'Reportes', Icon: ChartPieSlice, roles: ['ADMIN', 'SUPERVISOR'] },
   { to: '/notifications', label: 'Notificaciones', Icon: Bell, roles: ['ADMIN', 'SUPERVISOR', 'VENDEDOR'] },
+  { to: '/processing', label: 'Procesamiento', Icon: ClipboardText, roles: ['ADMIN', 'SUPERVISOR'] },
   { to: '/backups', label: 'Backups', Icon: Database, roles: ['ADMIN'] },
   { to: '/settings', label: 'Configuración', Icon: GearSix, roles: ['ADMIN'] },
 ];
@@ -66,37 +69,26 @@ const MENU_ORDER_KEY = 'menu_order';
 function useMenuOrder(userId?: number) {
   const [order, setOrder] = useState<string[] | null>(null);
 
-  // Cargar orden desde DB: primero personal, luego global como fallback
   useEffect(() => {
     if (!userId) return;
-    let cancelled = false;
 
-    async function load() {
-      try {
-        const prefs = await import('../../api/preferences');
-        const personal = await prefs.getOne<string[]>(MENU_ORDER_KEY);
-        if (!cancelled && Array.isArray(personal) && personal.length > 0) {
-          setOrder(personal);
-          return;
-        }
-        // Fallback: orden global guardado en config
-        const { default: client } = await import('../../api/client');
-        const cfg = await client.get('/config');
+    getPref<string[]>(MENU_ORDER_KEY).then((personal) => {
+      if (Array.isArray(personal) && personal.length > 0) {
+        setOrder(personal);
+        return;
+      }
+      client.get('/config').then((cfg) => {
         const raw = cfg.data?.[MENU_ORDER_KEY];
-        if (!cancelled && raw) {
+        if (raw) {
           try {
             const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
             if (Array.isArray(parsed) && parsed.length > 0) setOrder(parsed);
           } catch { /* sin orden global */ }
         }
-      } catch { /* silencioso: usa orden por defecto */ }
-    }
-
-    load();
-    return () => { cancelled = true; };
+      }).catch(() => {});
+    }).catch(() => {});
   }, [userId]);
 
-  // Escuchar cambios en tiempo real (sin reload)
   useEffect(() => {
     const handler = (e: any) => {
       if (Array.isArray(e?.detail)) setOrder(e.detail);
@@ -134,10 +126,10 @@ export function Sidebar() {
       />
       <aside
         style={{ willChange: 'transform' }}
-        className={`w-56 ${isDark ? 'bg-gray-900 text-white' : 'bg-white text-gray-800'} flex flex-col h-full z-40 absolute md:relative rounded-r-2xl md:rounded-none overflow-hidden transition-transform duration-[350ms] ease-[cubic-bezier(0.22,0.61,0.36,1)] shadow-2xl md:shadow-none
+        className={`w-56 ${isDark ? 'bg-gray-900 text-white' : 'bg-white text-gray-800'} flex flex-col h-full z-40 absolute md:relative rounded-r-2xl md:rounded-none overflow-hidden transition-all duration-[350ms] ease-[cubic-bezier(0.22,0.61,0.36,1)] shadow-2xl md:shadow-none
         ${sidebarOpen
           ? 'translate-x-0'
-          : '-translate-x-full md:translate-x-0 md:w-14 md:overflow-hidden'
+          :         '-translate-x-full md:translate-x-0 md:w-14 md:overflow-visible'
         }`}>
 
         {/* Branding + datos del negocio */}
@@ -155,17 +147,16 @@ export function Sidebar() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-1.5 overflow-auto thin-scroll">
+        <nav className={`flex-1 p-1.5 ${sidebarOpen ? 'overflow-auto thin-scroll' : ''}`}>
           {sortedNav
             .filter((item) => item.roles.includes(user?.role || ''))
             .map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
-                title={!sidebarOpen ? item.label : undefined}
                 onClick={() => { if (window.innerWidth < 768) toggleSidebar(); }}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-2 py-2 rounded-lg text-sm mb-0.5 transition-colors whitespace-nowrap ${!sidebarOpen ? 'justify-center' : ''} ${
+                  `relative group flex items-center gap-2 px-2 py-2 rounded-lg text-sm mb-0.5 transition-colors whitespace-nowrap ${!sidebarOpen ? 'justify-center' : ''} ${
                     isActive
                       ? 'bg-red-500 text-white'
                       : isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'
@@ -181,6 +172,11 @@ export function Sidebar() {
                     <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">{activeCartsCount}</span>
                   )}
                 </div>
+                {!sidebarOpen && (
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap pointer-events-none">
+                    {item.label}
+                  </div>
+                )}
                 {sidebarOpen && (
                   <span className="flex-1 flex items-center gap-1.5">
                     {item.label}

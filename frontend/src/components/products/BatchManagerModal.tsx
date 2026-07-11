@@ -7,6 +7,7 @@ import type { Batch } from '../../api/batches';
 import { Button, Input, DatePicker, Textarea, Badge } from '../ui';
 import { ExpiryBadge } from './ExpiryBadge';
 import { formatExpiry } from '../../utils/expiryHelpers';
+import { useModalEscape } from '../../contexts/ModalStackContext';
 
 export interface BatchManagerModalProps {
   productId: number;
@@ -34,6 +35,8 @@ export function BatchManagerModal({ productId, productName, open, onClose, onCha
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+
+  useModalEscape(onClose);
 
   async function refresh() {
     setLoading(true);

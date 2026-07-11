@@ -43,6 +43,8 @@ enum MovementType {
   LOSS
   RETURN
   EXPIRED
+  PROCESSING_OUTPUT
+  PROCESSING_INPUT
 }
 
 enum NotificationType {
@@ -131,6 +133,7 @@ model User {
   notifications      Notification[]
   expenses           Expense[]
   preferences        UserPreference[]
+  processingBatches  ProcessingBatch[]
 
   @@map("users")
 }
@@ -205,6 +208,8 @@ model Product {
   barcodeAliases CategoryBarcode[] @relation("LastProductBarcodes")
   discountRules ProductDiscountRule[]
   purchaseOrderItems PurchaseOrderItem[]
+  processingBatches  ProcessingBatch[]  @relation("ProcessedInputs")
+  processingOutputs  ProcessingOutput[]
 
   @@map("products")
 }
@@ -541,4 +546,44 @@ model PurchaseOrderItem {
   @@index([orderId])
   @@index([productId])
   @@map("purchase_order_items")
+}
+
+model ProcessingBatch {
+  id              Int               @id @default(autoincrement())
+  code            String            @unique
+  animalType      AnimalType        @map("animal_type")
+  inputProductId  Int               @map("input_product_id")
+  inputProduct    Product           @relation("ProcessedInputs", fields: [inputProductId], references: [id])
+  inputWeightKg   Decimal           @map("input_weight_kg") @db.Decimal(10, 3)
+  totalCost       Decimal           @map("total_cost") @db.Decimal(12, 2)
+  wasteWeightKg   Decimal           @default(0) @map("waste_weight_kg") @db.Decimal(10, 3)
+  notes           String?
+  status          String            @default("DRAFT")
+  processedBy     Int               @map("processed_by")
+  processor       User              @relation(fields: [processedBy], references: [id])
+  completedAt     DateTime?         @map("completed_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  outputs         ProcessingOutput[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("processing_batches")
+}
+
+model ProcessingOutput {
+  id              Int              @id @default(autoincrement())
+  batchId         Int              @map("batch_id")
+  batch           ProcessingBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  productId       Int              @map("product_id")
+  product         Product          @relation(fields: [productId], references: [id])
+  weightKg        Decimal          @map("weight_kg") @db.Decimal(10, 3)
+  costPerKg       Decimal          @map("cost_per_kg") @db.Decimal(10, 2)
+  totalCost       Decimal          @map("total_cost") @db.Decimal(12, 2)
+  salePricePerKg  Decimal?         @map("sale_price_per_kg") @db.Decimal(10, 2)
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@index([batchId])
+  @@index([productId])
+  @@map("processing_outputs")
 }

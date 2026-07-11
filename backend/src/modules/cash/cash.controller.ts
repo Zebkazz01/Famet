@@ -84,6 +84,22 @@ export async function createCashClosing(req: Request, res: Response) {
   return res.status(201).json(closing);
 }
 
+export async function deleteCashMovement(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const movement = await prisma.cashMovement.findUnique({ where: { id } });
+  if (!movement) return res.status(404).json({ error: "Movimiento no encontrado" });
+  await prisma.cashMovement.delete({ where: { id } });
+  return res.json({ message: "Movimiento eliminado permanentemente" });
+}
+
+export async function deleteCashClosing(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const closing = await prisma.cashClosing.findUnique({ where: { id } });
+  if (!closing) return res.status(404).json({ error: "Cierre no encontrado" });
+  await prisma.cashClosing.delete({ where: { id } });
+  return res.json({ message: "Cierre eliminado permanentemente" });
+}
+
 export async function getCashClosings(req: Request, res: Response) {
   const { from, to } = req.query;
 

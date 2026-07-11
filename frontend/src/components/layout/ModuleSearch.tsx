@@ -11,6 +11,7 @@ export function ModuleSearch() {
   const { isDark } = useTheme();
   const role = (user?.role as Role | undefined) || null;
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const {
     open, setOpen, query, setQuery, results, highlight, setHighlight, run, onKeyDown,
   } = useCommandSearch({ role });
@@ -18,6 +19,15 @@ export function ModuleSearch() {
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 30);
   }, [open]);
+
+  useEffect(() => {
+    if (highlight < 0 || !listRef.current) return;
+    const btn = listRef.current.querySelector<HTMLElement>('button');
+    if (!btn) return;
+    const all = listRef.current.querySelectorAll('button');
+    const active = all[highlight] as HTMLElement | undefined;
+    active?.scrollIntoView({ block: 'nearest' });
+  }, [highlight]);
 
   if (!user) return null;
 
@@ -79,7 +89,7 @@ export function ModuleSearch() {
                 }`}>Esc</kbd>
               </div>
 
-              <ul className="max-h-80 overflow-auto styled-scroll py-1">
+              <ul ref={listRef} className="max-h-80 overflow-auto styled-scroll py-1">
                 {results.length === 0 ? (
                   <li className="px-4 py-8 text-center text-sm text-gray-400">
                     Sin resultados para "{query}"

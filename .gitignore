@@ -1,49 +1,27 @@
 # Dependencias
 node_modules/
-
 # Build
 dist/
 dist-ssr/
 *.local
-
 # Entorno (SENSIBLE)
 .env
 backend/.env
-frontend/.env
-
 # Claude Code
 CLAUDE.md
 .claude/
-
 # Drivers binarios
 drivers/
-
 # Prisma local
 backend/prisma/*.db
 backend/prisma/*.db-journal
-
-# Backups
-backend/backups/
-
-# Uploads (imágenes, logos, comprobantes)
-backend/uploads/
-
 # Logs
 *.log
 npm-debug.log*
-pos-server*.log
-
-# SSL Certs (generados por mkcert)
-frontend/cert.pem
-frontend/key.pem
-frontend/rootCA.pem
-frontend/rootCA.crt
-
 # OS
 .DS_Store
 Thumbs.db
 desktop.ini
-
 # IDE
 .vscode/
 .idea/
@@ -52,11 +30,16 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
-
 # Cache
 .cache/
 *.tsbuildinfo
 
-# Temp files
-*.tmp
-*.bak
+# Uploads y backups
+backend/uploads/
+backend/backups/
+
+# Certificados
+*.pem
+
+# Temp
+null

@@ -10,6 +10,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { ScaleManager } from "./scale/scaleManager";
 import { setupScaleSocket } from "./scale/scaleSocket";
 import { log, printBanner, printRoutes, printScaleStatus, printDbStatus, printShutdown } from "./config/logger";
+import os from "os";
 
 // Rutas
 import authRoutes from "./modules/auth/auth.routes";
@@ -33,6 +34,7 @@ import preferencesRoutes from "./modules/preferences/preferences.routes";
 import animalPartsRoutes from "./modules/animalParts/animalParts.routes";
 import customersRoutes from "./modules/customers/customers.routes";
 import purchaseOrdersRoutes from "./modules/purchaseOrders/purchaseOrders.routes";
+import processingRoutes from "./modules/processing/processing.routes";
 import { authenticate, authorize } from "./middleware/auth";
 import { setIO } from "./realtime/socketRegistry";
 import * as cronManager from "./jobs/cronManager";
@@ -44,6 +46,12 @@ import { registerBackupJob, runBackup, restoreBackup, listBackups } from "./jobs
 import { uploadsDir as resolveUploadsDir, backupsDir } from "./utils/paths";
 
 const startTime = Date.now();
+
+// Flags de estado del servidor — el health endpoint los usa en vez de consultar BD
+let dbConnected = false;
+let dbInitialized = false;
+let serverReady = false;
+let dbError: string | null = null;
 
 const app = express();
 
@@ -82,24 +90,38 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check (público, sin auth) - usado por diagnóstico del frontend
-app.get("/api/health", async (_req, res) => {
-  let dbOk = false;
-  let initialized = false;
-  try {
-    const { prisma } = await import("./config/database");
-    await prisma.$queryRaw`SELECT 1`;
-    dbOk = true;
-    const userCount = await prisma.user.count();
-    initialized = userCount > 0;
-  } catch {}
-
+// Health check (público, sin auth) - usado por POS-loader.ps1 y frontend
+app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
-    database: dbOk,
-    initialized,
+    database: dbConnected,
+    initialized: dbInitialized,
+    ready: serverReady,
     scale: scaleManager.connected,
     uptime: Math.floor(process.uptime()),
+    dbError,
+  });
+});
+
+// Info de red para conexión desde el celular
+app.get("/api/network", (_req, res) => {
+  const interfaces = os.networkInterfaces();
+  let ip = "127.0.0.1";
+  for (const iface of Object.values(interfaces)) {
+    if (!iface) continue;
+    for (const addr of iface) {
+      if (addr.family === "IPv4" && !addr.internal) {
+        ip = addr.address;
+        break;
+      }
+    }
+    if (ip !== "127.0.0.1") break;
+  }
+  res.json({
+    ip,
+    port: env.PORT,
+    protocol: httpsEnabled && fs.existsSync(certPath) && fs.existsSync(keyPath) ? "https" : "http",
+    hostname: os.hostname(),
   });
 });
 
@@ -127,6 +149,7 @@ app.use("/api/preferences", preferencesRoutes);
 app.use("/api/animal-parts", animalPartsRoutes);
 app.use("/api/customers", customersRoutes);
 app.use("/api/purchase-orders", purchaseOrdersRoutes);
+app.use("/api/processing", processingRoutes);
 app.get("/api/manifest.json", manifestHandler);
 
 // Servir imágenes (logo, productos, gastos). Path absoluto independiente del cwd.
@@ -349,6 +372,9 @@ httpServer.listen(env.PORT, async () => {
   try {
     const { prisma } = await import("./config/database");
     await prisma.$queryRaw`SELECT 1`;
+    dbConnected = true;
+    const userCount = await prisma.user.count();
+    dbInitialized = userCount > 0;
     printDbStatus(true, Date.now() - dbStart);
     // Precargar config cache
     try { await configCache.ensureLoaded(); } catch {}
@@ -370,43 +396,57 @@ httpServer.listen(env.PORT, async () => {
     registerBackupJob();
     cronManager.start();
   } catch (e: any) {
+    dbConnected = false;
+    dbError = (e as Error).message;
     printDbStatus(false, Date.now() - dbStart);
-    log.error(e.message);
+    log.error(dbError);
   }
 
+  serverReady = true;
+
   // Auto-detectar puerto balanza por VID/PID conocidos.
-  // Prioridad: 1) BD (scale_port), 2) auto-detect, 3) env.SCALE_PORT
+  // Prioridad: 1) auto-detect, 2) BD (scale_port guardado), 3) env.SCALE_PORT
   const savedPort = configCache.get("scale_port");
-  let scalePath = savedPort || env.SCALE_PORT;
-  if (savedPort) log.info(`[scale] puerto cargado de BD: ${savedPort}`);
   const savedBaud = configCache.get("scale_baud_rate");
   const baudFinal = savedBaud ? Number(savedBaud) : env.SCALE_BAUD_RATE;
-  if (savedPort || savedBaud) {
-    scaleManager.updateConfig(scalePath, baudFinal);
-  }
-  const auto = process.env.SCALE_AUTODETECT !== "false" && !savedPort;
-  if (auto) {
+  let scalePath = env.SCALE_PORT;
+  if (process.env.SCALE_AUTODETECT !== "false") {
     try {
       const detected = await ScaleManager.findScalePort();
       if (detected) {
-        if (detected !== env.SCALE_PORT) {
-          log.info(`[scale] auto-detectada en ${detected} (env decia ${env.SCALE_PORT})`);
-        } else {
-          log.info(`[scale] auto-detectada en ${detected}`);
-        }
         scalePath = detected;
-        scaleManager.setPort(scalePath);
+        log.info(`[scale] balanza detectada automaticamente en ${detected}`);
+      } else if (savedPort) {
+        scalePath = savedPort;
+        log.info(`[scale] usando puerto guardado: ${savedPort}`);
       } else {
         log.warn(`[scale] no se detecto balanza por VID/PID, usando puerto de env: ${env.SCALE_PORT}`);
       }
     } catch (e: any) {
-      log.warn(`[scale] auto-detect fallo: ${e.message}`);
+      log.warn(`[scale] auto-detect fallo, usando puerto guardado/env: ${e.message}`);
+      if (savedPort) scalePath = savedPort;
     }
+  } else if (savedPort) {
+    scalePath = savedPort;
   }
-  log.info(`Conectando balanza en ${scalePath}...`);
-  scaleManager.connect()
-    .then(() => printScaleStatus(true))
-    .catch((err) => printScaleStatus(false, err.message));
+  scaleManager.setPort(scalePath);
+  if (savedPort || savedBaud) {
+    scaleManager.updateConfig(scalePath, baudFinal);
+  }
+  const scaleDisabled = configCache.get("scale_disabled") === "true";
+  if (scaleDisabled) {
+    log.info("[scale] balanza deshabilitada por configuracion global");
+  } else {
+    log.info(`Conectando balanza en ${scalePath}...`);
+    scaleManager.connect()
+      .then(() => printScaleStatus(true))
+      .catch((err) => printScaleStatus(false, err.message));
+  }
+});
+
+// Evita que unhandled rejections tiren toda la app
+process.on("unhandledRejection", (reason) => {
+  log.error(`[process] unhandledRejection: ${reason}`);
 });
 
 // Graceful shutdown

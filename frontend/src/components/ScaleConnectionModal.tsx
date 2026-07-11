@@ -3,11 +3,14 @@ import { useScale } from '../contexts/ScaleContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { Portal } from './Portal';
 import toast from 'react-hot-toast';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 export function ScaleConnectionModal() {
   const { status, disabled, disableScale, reconnect, reconnecting } = useScale();
   const { config } = useConfig();
   const [showConfirm, setShowConfirm] = useState(false);
+
+  useModalEscape(disableScale);
 
   async function handleReconnect() {
     const r = await reconnect();

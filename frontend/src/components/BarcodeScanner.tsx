@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Camera, X, Barcode, ArrowsClockwise } from '@phosphor-icons/react';
 import { Portal } from './Portal';
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 export function playBeep(success: boolean) {
   try {
@@ -52,6 +53,8 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
+
+  useModalEscape(onClose);
 
   // Listar cámaras disponibles
   useEffect(() => {
@@ -209,7 +212,7 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
 
   return (
     <Portal>
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[10000] p-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
           <div className="px-4 py-3 border-b dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-slate-900">
             <div className="flex items-center gap-2">

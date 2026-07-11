@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
-import { Users, Plus, X, PencilSimple, Money, CurrencyDollar, Phone, IdentificationCard, Receipt, Check, Tag, Warning, UserCircle, NotePencil, SortAscending } from '@phosphor-icons/react';
+import { Users, Plus, X, PencilSimple, Money, CurrencyDollar, Phone, IdentificationCard, Receipt, Check, Tag, Warning, UserCircle, NotePencil, SortAscending, Funnel, Folder } from '@phosphor-icons/react';
 import * as api from '../api/customers';
 import type { Customer, CustomerPayment } from '../api/customers';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
@@ -8,17 +8,16 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Portal } from '../components/Portal';
 import { PageSkeleton } from '../components/PageSkeleton';
 import { ViewToggle } from '../components/ViewToggle';
+import { FilterPanel, Combobox } from '../components/ui';
+import { useTableFilters } from '../hooks/useTableFilters';
+import { useEnterSubmit } from '../hooks/useEnterSubmit';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 const emptyForm = { name: '', phone: '', document: '', notes: '', creditLimit: '', discountPercent: '' };
-
-type FilterMode = 'all' | 'debt' | 'discount' | 'noDebt';
-type SortMode = 'name' | 'debtDesc' | 'debtAsc' | 'discountDesc' | 'recent';
 
 export function CustomersPage() {
   const [list, setList] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterMode, setFilterMode] = useState<FilterMode>('all');
-  const [sortMode, setSortMode] = useState<SortMode>('name');
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -26,28 +25,38 @@ export function CustomersPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: 0, method: 'CASH' as const, reference: '', notes: '', saleId: null as number | null });
 
+  useModalEscape(showForm ? () => setShowForm(false) : null);
+  useModalEscape(detail ? () => setDetail(null) : null);
+  useModalEscape(showPayment ? () => setShowPayment(false) : null);
+
   const load = () => api.list()
     .then((data) => { setList(data); setLoading(false); })
     .catch(() => { setLoading(false); });
 
   useEffect(() => { load(); }, []);
 
+  const { filters: cFilters, setFilter: setCFilter, clear: clearCFilters, activeCount: cActiveCount } = useTableFilters<{
+    debtStatus: string; discountStatus: string; sort: string;
+  }>({ debtStatus: '', discountStatus: '', sort: 'name' });
+
   const filtered = useMemo(() => {
     const f = list.filter((c) => {
-      if (filterMode === 'debt') return Number(c.currentDebt) > 0;
-      if (filterMode === 'noDebt') return Number(c.currentDebt) <= 0;
-      if (filterMode === 'discount') return Number(c.discountPercent) > 0;
+      if (cFilters.debtStatus === 'debt' && Number(c.currentDebt) <= 0) return false;
+      if (cFilters.debtStatus === 'noDebt' && Number(c.currentDebt) > 0) return false;
+      if (cFilters.discountStatus === 'withDiscount' && Number(c.discountPercent) <= 0) return false;
+      if (cFilters.discountStatus === 'noDiscount' && Number(c.discountPercent) > 0) return false;
       return true;
     });
     return f.sort((a, b) => {
-      if (sortMode === 'name') return a.name.localeCompare(b.name, 'es');
-      if (sortMode === 'debtDesc') return Number(b.currentDebt) - Number(a.currentDebt);
-      if (sortMode === 'debtAsc') return Number(a.currentDebt) - Number(b.currentDebt);
-      if (sortMode === 'discountDesc') return Number(b.discountPercent) - Number(a.discountPercent);
-      if (sortMode === 'recent') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      const s = cFilters.sort || 'name';
+      if (s === 'name') return a.name.localeCompare(b.name, 'es');
+      if (s === 'debtDesc') return Number(b.currentDebt) - Number(a.currentDebt);
+      if (s === 'debtAsc') return Number(a.currentDebt) - Number(b.currentDebt);
+      if (s === 'discountDesc') return Number(b.discountPercent) - Number(a.discountPercent);
+      if (s === 'recent') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       return 0;
     });
-  }, [list, filterMode, sortMode]);
+  }, [list, cFilters]);
 
   const stats = useMemo(() => {
     const withDebt = list.filter((c) => Number(c.currentDebt) > 0);
@@ -122,6 +131,8 @@ export function CustomersPage() {
     }
   }
 
+  useEnterSubmit(save, showForm);
+
   if (loading) return <PageSkeleton type="table" />;
 
   return (
@@ -137,49 +148,37 @@ export function CustomersPage() {
         }
       />
 
-      {/* Stats cards con gradient e iconos */}
+      {/* Stats cards */}
       <div id="customers-stats" className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <button
-          onClick={() => setFilterMode('all')}
-          className={`relative overflow-hidden text-left rounded-xl p-4 border transition-all ${filterMode === 'all' ? 'ring-2 ring-blue-400 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/30 dark:to-blue-900/10 border-blue-200 dark:border-blue-700' : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-gray-700 hover:border-blue-200'}`}
-        >
+        <div className="relative overflow-hidden text-left rounded-xl p-4 border bg-white dark:bg-slate-800 border-gray-100 dark:border-gray-700">
           <div className="flex items-start justify-between mb-2">
             <div className="w-9 h-9 rounded-lg bg-blue-500/15 text-blue-600 flex items-center justify-center">
               <Users size={20} weight="duotone" />
             </div>
-            {filterMode === 'all' && <span className="text-[9px] bg-blue-500 text-white px-1.5 py-0.5 rounded font-bold">Activo</span>}
           </div>
           <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Total clientes</p>
           <p className="text-2xl font-bold mt-0.5">{list.length}</p>
-        </button>
+        </div>
 
-        <button
-          onClick={() => setFilterMode('debt')}
-          className={`relative overflow-hidden text-left rounded-xl p-4 border transition-all ${filterMode === 'debt' ? 'ring-2 ring-amber-400 bg-gradient-to-br from-amber-50 to-orange-100/50 dark:from-amber-900/30 dark:to-amber-900/10 border-amber-200 dark:border-amber-700' : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-gray-700 hover:border-amber-200'}`}
-        >
+        <div className="relative overflow-hidden text-left rounded-xl p-4 border bg-white dark:bg-slate-800 border-gray-100 dark:border-gray-700">
           <div className="flex items-start justify-between mb-2">
             <div className="w-9 h-9 rounded-lg bg-amber-500/15 text-amber-600 flex items-center justify-center">
               <Warning size={20} weight="duotone" />
             </div>
-            {filterMode === 'debt' && <span className="text-[9px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-bold">Activo</span>}
           </div>
           <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Con deuda</p>
           <p className="text-2xl font-bold mt-0.5 text-amber-600">{stats.withDebt.length}</p>
-        </button>
+        </div>
 
-        <button
-          onClick={() => setFilterMode('discount')}
-          className={`relative overflow-hidden text-left rounded-xl p-4 border transition-all ${filterMode === 'discount' ? 'ring-2 ring-green-400 bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-900/30 dark:to-green-900/10 border-green-200 dark:border-green-700' : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-gray-700 hover:border-green-200'}`}
-        >
+        <div className="relative overflow-hidden text-left rounded-xl p-4 border bg-white dark:bg-slate-800 border-gray-100 dark:border-gray-700">
           <div className="flex items-start justify-between mb-2">
             <div className="w-9 h-9 rounded-lg bg-green-500/15 text-green-600 flex items-center justify-center">
               <Tag size={20} weight="duotone" />
             </div>
-            {filterMode === 'discount' && <span className="text-[9px] bg-green-500 text-white px-1.5 py-0.5 rounded font-bold">Activo</span>}
           </div>
           <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Con descuento</p>
           <p className="text-2xl font-bold mt-0.5 text-green-600">{stats.withDiscount.length}</p>
-        </button>
+        </div>
 
         <div className="rounded-xl p-4 border bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-900/30 dark:to-red-900/10 border-red-200 dark:border-red-700">
           <div className="flex items-start justify-between mb-2">
@@ -192,33 +191,44 @@ export function CustomersPage() {
         </div>
       </div>
 
-      {/* Sort + indicador de filtro */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        <div className="relative">
-          <SortAscending size={14} weight="bold" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          <select
-            value={sortMode}
-            onChange={(e) => setSortMode(e.target.value as SortMode)}
-            className="pl-9 pr-8 py-2 border border-gray-200 dark:border-gray-700 dark:bg-slate-800 rounded-lg text-sm focus:border-red-300 focus:outline-none transition-colors appearance-none cursor-pointer h-9"
-          >
-            <option value="name">Nombre (A-Z)</option>
-            <option value="recent">Más recientes</option>
-            <option value="debtDesc">Mayor deuda</option>
-            <option value="debtAsc">Menor deuda</option>
-            <option value="discountDesc">Mayor descuento</option>
-          </select>
-        </div>
-        {filterMode !== 'all' && (
-          <button onClick={() => setFilterMode('all')} className="inline-flex items-center justify-center gap-1.5 px-3 h-9 text-xs font-medium text-gray-600 bg-gray-100 dark:bg-slate-700 rounded-lg hover:bg-gray-200">
-            <X size={12} weight="bold" /> Quitar filtro: {filterMode === 'debt' ? 'Con deuda' : filterMode === 'discount' ? 'Con descuento' : 'Sin deuda'}
-          </button>
-        )}
+      {/* Filtros */}
+      <div className="mb-4">
+        <FilterPanel storageKey="customers" toggleOnEvent="fameat:toggle-filters"
+          activeCount={cActiveCount}
+          onClear={clearCFilters}
+          chips={[
+            ...(cFilters.debtStatus ? [{ key: 'debt', label: cFilters.debtStatus === 'debt' ? 'Con deuda' : 'Sin deuda', onRemove: () => setCFilter('debtStatus', '') }] : []),
+            ...(cFilters.discountStatus ? [{ key: 'disc', label: cFilters.discountStatus === 'withDiscount' ? 'Con descuento' : 'Sin descuento', onRemove: () => setCFilter('discountStatus', '') }] : []),
+          ]}
+        >
+          <Combobox label="Estado de deuda" icon={<Warning size={14} weight="duotone" />} placeholder="Selecciona estado"
+            options={[
+              { value: '', label: 'Todos' },
+              { value: 'debt', label: 'Con deuda' },
+              { value: 'noDebt', label: 'Sin deuda' },
+            ]}
+            value={cFilters.debtStatus} onChange={(v) => setCFilter('debtStatus', (v as string) || '')} />
+          <Combobox label="Descuento" icon={<Tag size={14} weight="duotone" />} placeholder="Selecciona descuento"
+            options={[
+              { value: '', label: 'Todos' },
+              { value: 'withDiscount', label: 'Con descuento' },
+              { value: 'noDiscount', label: 'Sin descuento' },
+            ]}
+            value={cFilters.discountStatus} onChange={(v) => setCFilter('discountStatus', (v as string) || '')} />
+          <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
+            { value: 'name', label: 'Nombre A-Z' },
+            { value: 'recent', label: 'Más recientes' },
+            { value: 'debtDesc', label: 'Mayor deuda' },
+            { value: 'debtAsc', label: 'Menor deuda' },
+            { value: 'discountDesc', label: 'Mayor descuento' },
+          ]} value={cFilters.sort || 'name'} onChange={(v) => setCFilter('sort', (v as string) || '')} clearable={false} />
+        </FilterPanel>
       </div>
 
       {/* Lista de clientes — tabla / tarjetas */}
       <div id="customers-list" className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3">
         <ViewToggle
-          storageKey="customers"
+          storageKey="customers" searchInputProps={{ 'data-search-input': '' }}
           data={filtered}
           keyField="id"
           searchPlaceholder="Buscar por nombre, teléfono o documento..."
@@ -227,7 +237,7 @@ export function CustomersPage() {
             (c.phone || '').toLowerCase().includes(query) ||
             (c.document || '').toLowerCase().includes(query)
           }
-          emptyMessage={filterMode === 'all' ? 'Aún no hay clientes' : 'Sin clientes en este filtro'}
+          emptyMessage={!cFilters.debtStatus && !cFilters.discountStatus ? 'Aún no hay clientes' : 'Sin clientes en este filtro'}
           emptyIcon={<UserCircle size={32} weight="duotone" className="text-gray-400" />}
           onCreateNew={startNew}
           createNewLabel="Nuevo cliente"

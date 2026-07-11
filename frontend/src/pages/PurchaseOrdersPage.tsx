@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
-import { ClipboardText, Plus, X, Check, ArrowsClockwise, Truck, Package as PackageIcon, Trash, Clock, CheckCircle, CurrencyDollar } from '@phosphor-icons/react';
+import { ClipboardText, Plus, X, Check, ArrowsClockwise, Truck, Package as PackageIcon, Trash, Clock, CheckCircle, CurrencyDollar, MagnifyingGlass, Funnel, SortAscending } from '@phosphor-icons/react';
 import { StatsCards } from '../components/StatsCards';
 import * as api from '../api/purchaseOrders';
 import type { PurchaseOrder } from '../api/purchaseOrders';
@@ -8,6 +8,10 @@ import client from '../api/client';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Portal } from '../components/Portal';
+import { FilterPanel, Combobox } from '../components/ui';
+import { useTableFilters } from '../hooks/useTableFilters';
+import { useEnterSubmit } from '../hooks/useEnterSubmit';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 interface Supplier { id: number; name: string; nit: string | null }
 interface ProductLite { id: number; name: string; cost: string | null; weightUnit: string; saleType: string }
@@ -22,7 +26,8 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 
 export function PurchaseOrdersPage() {
   const [list, setList] = useState<PurchaseOrder[]>([]);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [detail, setDetail] = useState<PurchaseOrder | null>(null);
   const [showReceive, setShowReceive] = useState(false);
@@ -42,12 +47,42 @@ export function PurchaseOrdersPage() {
   const [receiveQty, setReceiveQty] = useState<Record<number, number>>({});
   const [receiveNotes, setReceiveNotes] = useState('');
 
-  const load = () => api.list({ status: statusFilter || undefined }).then(setList).catch(() => {});
-  useEffect(() => { load(); }, [statusFilter]);
+  useModalEscape(showForm ? () => setShowForm(false) : null);
+  useModalEscape(detail ? () => setDetail(null) : null);
+  useModalEscape(showReceive ? () => setShowReceive(false) : null);
+
+  const { filters: oFilters, setFilter: setOFilter, clear: clearOFilters, activeCount: oActiveCount } = useTableFilters<{
+    status: string; supplierId: string; sort: string;
+  }>({ status: '', supplierId: '', sort: 'recent' });
+
+  const load = () => {
+    setLoading(true);
+    api.list({}).then((data) => { setList(data); setLoading(false); }).catch(() => { setLoading(false); });
+  };
+  useEffect(() => { load(); }, []);
   useEffect(() => {
     client.get('/suppliers').then((r) => setSuppliers(r.data)).catch(() => {});
     client.get('/products').then((r) => setProducts(r.data)).catch(() => {});
   }, []);
+
+  const filtered = useMemo(() => {
+    return list.filter((o) => {
+      if (oFilters.status && o.status !== oFilters.status) return false;
+      if (oFilters.supplierId && String(o.supplierId) !== oFilters.supplierId) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (!o.code.toLowerCase().includes(q) && !(o.supplier?.name || '').toLowerCase().includes(q)) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      const s = oFilters.sort || 'recent';
+      if (s === 'recent') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (s === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (s === 'totalDesc') return parseFloat(b.total) - parseFloat(a.total);
+      if (s === 'totalAsc') return parseFloat(a.total) - parseFloat(b.total);
+      return 0;
+    });
+  }, [list, oFilters, search]);
 
   function addItem() {
     setForm({ ...form, items: [...form.items, { productId: 0, quantityOrdered: 1, unitCost: 0 }] });
@@ -118,6 +153,8 @@ export function PurchaseOrdersPage() {
     }
   }
 
+  useEnterSubmit(createOrder, showForm);
+
   return (
     <div className="p-3 md:p-6">
       <PageHeader
@@ -140,45 +177,106 @@ export function PurchaseOrdersPage() {
       ]} />
 
       {/* Filtros */}
-      <div id="orders-status-filter" className="flex gap-2 mb-3 flex-wrap">
-        {['', 'DRAFT', 'SENT', 'PARTIAL', 'RECEIVED', 'CANCELLED'].map((s) => (
-          <button key={s} onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1 rounded-full text-xs font-medium ${statusFilter === s ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-200'}`}>
-            {s ? STATUS_META[s]?.label : 'Todas'}
-          </button>
-        ))}
+      <div className="mb-4">
+        <FilterPanel storageKey="purchaseOrders" toggleOnEvent="fameat:toggle-filters"
+          activeCount={oActiveCount}
+          onClear={clearOFilters}
+          chips={[
+            ...(oFilters.status ? [{ key: 'status', label: STATUS_META[oFilters.status]?.label || oFilters.status, onRemove: () => setOFilter('status', '') }] : []),
+            ...(oFilters.supplierId ? [{ key: 'sup', label: `Prov: ${suppliers.find((s) => String(s.id) === oFilters.supplierId)?.name || oFilters.supplierId}`, onRemove: () => setOFilter('supplierId', '') }] : []),
+          ]}
+        >
+          <Combobox label="Estado" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona estado"
+            options={[
+              { value: '', label: 'Todos' },
+              ...Object.entries(STATUS_META).map(([k, v]) => ({ value: k, label: v.label })),
+            ]}
+            value={oFilters.status} onChange={(v) => setOFilter('status', (v as string) || '')} />
+          <Combobox label="Proveedor" icon={<Truck size={14} weight="duotone" />} placeholder="Selecciona proveedor"
+            options={[{ value: '', label: 'Todos' }, ...suppliers.map((s) => ({ value: String(s.id), label: s.name }))]}
+            value={oFilters.supplierId} onChange={(v) => setOFilter('supplierId', (v as string) || '')} />
+          <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
+            { value: 'recent', label: 'Más reciente' },
+            { value: 'oldest', label: 'Más antiguo' },
+            { value: 'totalDesc', label: 'Total mayor a menor' },
+            { value: 'totalAsc', label: 'Total menor a mayor' },
+          ]} value={oFilters.sort || 'recent'} onChange={(v) => setOFilter('sort', (v as string) || '')} clearable={false} />
+        </FilterPanel>
       </div>
 
+      {/* Barra de búsqueda */}
+      <div className="relative mb-3">
+        <MagnifyingGlass size={16} weight="duotone" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input type="text" value={search} data-search-input=""
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por código o proveedor..."
+          className="w-full pl-9 pr-8 h-10 text-sm border border-gray-200 dark:border-gray-700 dark:bg-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all" />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <X size={14} weight="bold" />
+          </button>
+        )}
+      </div>
+
+      {/* Lista */}
       <div id="orders-list" className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-slate-900/50">
-            <tr>
-              <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Código</th>
-              <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Proveedor</th>
-              <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Estado</th>
-              <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500 hidden md:table-cell">Fecha</th>
-              <th className="text-right px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Items</th>
-              <th className="text-right px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {list.length === 0 && <tr><td colSpan={6} className="text-center text-gray-400 py-8">Sin órdenes</td></tr>}
-            {list.map((o) => (
-              <tr key={o.id} onClick={() => openDetail(o.id)} className="hover:bg-gray-50 dark:hover:bg-slate-700/40 cursor-pointer">
-                <td className="px-3 py-2 font-mono font-bold">{o.code}</td>
-                <td className="px-3 py-2">{o.supplier?.name || `#${o.supplierId}`}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_META[o.status]?.color}`}>
-                    {STATUS_META[o.status]?.label}
-                  </span>
-                </td>
-                <td className="px-3 py-2 hidden md:table-cell text-gray-500 text-xs">{formatDateTime(o.createdAt)}</td>
-                <td className="px-3 py-2 text-right">{o._count?.items || 0}</td>
-                <td className="px-3 py-2 text-right font-mono font-bold">{formatCurrency(o.total)}</td>
+        {list.length === 0 && !loading ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4">
+              <ClipboardText size={32} weight="duotone" className="text-gray-400" />
+            </div>
+            <p className="font-semibold text-gray-700 dark:text-gray-200 mb-1">Aún no hay órdenes de compra</p>
+            <p className="text-sm text-gray-400 mb-4">Crea la primera orden para empezar a gestionar compras</p>
+            <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors">
+              <Plus size={16} weight="bold" /> Nueva OC
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <div className="w-16 h-16 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center mb-4">
+              <MagnifyingGlass size={32} weight="duotone" className="text-amber-500" />
+            </div>
+            <p className="font-semibold text-gray-700 dark:text-gray-200 mb-1">Sin resultados</p>
+            <p className="text-sm text-gray-400 mb-4">No hay órdenes que coincidan con los filtros o búsqueda</p>
+            <div className="flex gap-2">
+              <button onClick={() => { setSearch(''); clearOFilters(); }} className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium transition-colors">
+                <X size={14} weight="bold" /> Limpiar filtros
+              </button>
+              <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors">
+                <Plus size={16} weight="bold" /> Nueva OC
+              </button>
+            </div>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 dark:bg-slate-900/50">
+              <tr>
+                <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Código</th>
+                <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Proveedor</th>
+                <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Estado</th>
+                <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500 hidden md:table-cell">Fecha</th>
+                <th className="text-right px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Items</th>
+                <th className="text-right px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {filtered.map((o) => (
+                <tr key={o.id} onClick={() => openDetail(o.id)} className="hover:bg-gray-50 dark:hover:bg-slate-700/40 cursor-pointer">
+                  <td className="px-3 py-2 font-mono font-bold">{o.code}</td>
+                  <td className="px-3 py-2">{o.supplier?.name || `#${o.supplierId}`}</td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_META[o.status]?.color}`}>
+                      {STATUS_META[o.status]?.label}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 hidden md:table-cell text-gray-500 text-xs">{formatDateTime(o.createdAt)}</td>
+                  <td className="px-3 py-2 text-right">{o._count?.items || 0}</td>
+                  <td className="px-3 py-2 text-right font-mono font-bold">{formatCurrency(o.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Modal crear OC */}

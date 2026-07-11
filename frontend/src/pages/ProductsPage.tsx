@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import client from '../api/client';
 import { formatCurrency, formatDateTime, formatQty } from '../utils/formatters';
+import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Clock } from '@phosphor-icons/react';
 import toast from 'react-hot-toast';
-import { Package, Plus, Scales, Cube, ArrowsLeftRight, PencilSimple, Prohibit, Eye, ImageSquare, ChartLineUp, Truck, X, Check, ArrowCounterClockwise, WarningCircle, Tag, Folder, SortAscending, Funnel } from '@phosphor-icons/react';
+import { Package, Plus, Scales, Cube, ArrowsLeftRight, PencilSimple, Prohibit, Eye, ImageSquare, ChartLineUp, Truck, X, Check, ArrowCounterClockwise, WarningCircle, Warning, Tag, Folder, SortAscending, Funnel, Trash } from '@phosphor-icons/react';
 import { StatsCards } from '../components/StatsCards';
 import { ViewToggle } from '../components/ViewToggle';
 import { StockBadge } from '../utils/stockHelpers';
@@ -12,6 +13,27 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { Portal } from '../components/Portal';
 import { CurrencyInput } from '../components/CurrencyInput';
 import { PageHeader } from '../components/layout/PageHeader';
+
+function formatRelationRecord(key: string, rec: any): string {
+  if (key === 'priceHistory') {
+    const p = `$${Number(rec.price).toLocaleString('es-CO')}`;
+    const c = rec.cost ? ` (costo: $${Number(rec.cost).toLocaleString('es-CO')})` : '';
+    const d = new Date(rec.createdAt).toLocaleDateString('es-CO');
+    const n = rec.notes ? ` - ${rec.notes}` : '';
+    return `${p}${c} - ${d}${n}`;
+  }
+  if (key === 'inventoryMovements') {
+    const typeLabel: Record<string, string> = { ENTRY: 'Entrada', LOSS: 'Salida', ADJUSTMENT: 'Ajuste', RETURN: 'Devolución' };
+    const t = typeLabel[rec.type] || rec.type;
+    const q = Number(rec.quantity).toFixed(3);
+    const d = new Date(rec.createdAt).toLocaleDateString('es-CO');
+    const u = rec.user ? `${rec.user.firstName} ${rec.user.lastName}` : '';
+    return `${t} - ${q} - ${d}${u ? ` - ${u}` : ''}`;
+  }
+  if (key === 'saleItems') return `Venta #${rec.saleId || rec.id}`;
+  if (key === 'purchaseOrderItems') return `${rec.code || `OC #${rec.id}`} - ${rec.supplier?.name || ''}`;
+  return `#${rec.id}`;
+}
 
 interface Category {
   id: number;
@@ -91,10 +113,15 @@ import { BatchManagerModal } from '../components/products/BatchManagerModal';
 import { DiscountRulesEditor } from '../components/products/DiscountRulesEditor';
 import { FilterPanel, Combobox } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
+import { useEnterSubmit } from '../hooks/useEnterSubmit';
+import { useScale } from '../contexts/ScaleContext';
 import { getBestPromoLabel } from '../utils/discountHelpers';
 import { Barcode as BarcodeIcon } from '@phosphor-icons/react';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 export function ProductsPage() {
+  const { weight, stable, connected, unit } = useScale();
+  const { hasRole } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -114,6 +141,22 @@ export function ProductsPage() {
   const [formImagePreview, setFormImagePreview] = useState<string | null>(null);
   const [viewImage, setViewImage] = useState<{ url: string; name: string } | null>(null);
   const [formImageFile, setFormImageFile] = useState<File | null>(null);
+  const [productRelations, setProductRelations] = useState<{
+    count: number; canDelete: boolean;
+    details: { saleItems: number; inventoryMovements: number; priceHistory: number; purchaseOrderItems: number };
+  } | null>(null);
+  const [showRelationsModal, setShowRelationsModal] = useState(false);
+  const [expandedRel, setExpandedRel] = useState<string | null>(null);
+  const [relRecords, setRelRecords] = useState<Record<string, any[]>>({});
+  const [relLoading, setRelLoading] = useState(false);
+
+  useModalEscape(showForm ? () => setShowForm(false) : null);
+  useModalEscape(detailProduct ? () => setDetailProduct(null) : null);
+  useModalEscape(showHistory ? () => setShowHistory(false) : null);
+  useModalEscape(showRelationsModal ? () => setShowRelationsModal(false) : null);
+  useModalEscape(viewImage ? () => setViewImage(null) : null);
+  useModalEscape(confirmDelete ? () => setConfirmDelete(null) : null);
+  useModalEscape(batchesFor ? () => setBatchesFor(null) : null);
 
   const load = () => {
     client.get('/products?active=all').then((r) => setProducts(r.data));
@@ -122,6 +165,14 @@ export function ProductsPage() {
   };
 
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Obtener registros asociados al producto del detalle
+  useEffect(() => {
+    if (!detailProduct) { setProductRelations(null); return; }
+    client.get(`/products/${detailProduct.id}/sales-count`)
+      .then((r) => setProductRelations({ count: r.data.count, canDelete: r.data.canDelete, details: r.data.details }))
+      .catch(() => setProductRelations({ count: -1, canDelete: false, details: { saleItems: 0, inventoryMovements: 0, priceHistory: 0, purchaseOrderItems: 0 } }));
+  }, [detailProduct]);
 
   // Carga inicial de datos (sólo mount)
   useEffect(() => {
@@ -180,8 +231,14 @@ export function ProductsPage() {
     ? (parseFloat(form.bulkCost) / parseFloat(form.stockQty)).toFixed(2)
     : null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    // Validar nombre único (case-insensitive)
+    const nameDup = products.find((p) => p.name.toLowerCase() === form.name.toLowerCase().trim() && p.id !== editId);
+    if (nameDup) {
+      toast.error(`Ya existe un producto llamado "${form.name.trim()}"`);
+      return;
+    }
     // Validar código de barras único
     if (form.barcode) {
       const duplicate = products.find((p) => p.barcode === form.barcode && p.id !== editId);
@@ -272,9 +329,14 @@ export function ProductsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    await client.delete(`/products/${id}`);
-    toast.success('Producto desactivado');
+    try {
+      const { data } = await client.delete(`/products/${id}`);
+      toast.success(data.message);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al eliminar producto');
+    }
     setConfirmDelete(null);
+    setDetailProduct(null);
     load();
   };
 
@@ -283,6 +345,52 @@ export function ProductsPage() {
     toast.success('Producto reactivado');
     load();
   };
+
+  const RELATION_KEYS: Record<string, { label: string; icon: any; color: string; deletable: boolean }> = {
+    saleItems: { label: 'Ventas', icon: Package, color: 'text-blue-500', deletable: false },
+    inventoryMovements: { label: 'Movimientos de inventario', icon: ArrowsLeftRight, color: 'text-amber-500', deletable: true },
+    priceHistory: { label: 'Historial de precios', icon: ChartLineUp, color: 'text-purple-500', deletable: true },
+    purchaseOrderItems: { label: 'Órdenes de compra', icon: Truck, color: 'text-green-500', deletable: false },
+  };
+
+  async function loadRelationRecords(key: string) {
+    if (!detailProduct) return;
+    const meta = RELATION_KEYS[key];
+    if (!meta?.deletable) { setExpandedRel(expandedRel === key ? null : key); return; }
+    setExpandedRel(key);
+    if (relRecords[key]) return;
+    setRelLoading(true);
+    try {
+      let records: any[] = [];
+      if (key === 'priceHistory') {
+        const r = await client.get(`/products/${detailProduct.id}/price-history`);
+        records = r.data;
+      } else if (key === 'inventoryMovements') {
+        const r = await client.get(`/inventory/movements?productId=${detailProduct.id}`);
+        records = r.data;
+      }
+      setRelRecords((prev) => ({ ...prev, [key]: records }));
+    } catch { toast.error('Error al cargar registros'); }
+    finally { setRelLoading(false); }
+  }
+
+  async function handleDeleteRelationRecord(key: string, recordId: number) {
+    try {
+      if (key === 'priceHistory' && detailProduct) {
+        await client.delete(`/products/${detailProduct.id}/price-history/${recordId}`);
+      } else if (key === 'inventoryMovements') {
+        await client.delete(`/inventory/movements/${recordId}`);
+      }
+      toast.success('Registro eliminado');
+      setRelRecords((prev) => ({ ...prev, [key]: (prev[key] || []).filter((r: any) => r.id !== recordId) }));
+      if (detailProduct) {
+        const r = await client.get(`/products/${detailProduct.id}/sales-count`);
+        setProductRelations({ count: r.data.count, canDelete: r.data.canDelete, details: r.data.details });
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al eliminar registro');
+    }
+  }
 
   const handleUploadImage = async (productId: number, file: File) => {
     const formData = new FormData();
@@ -341,6 +449,8 @@ export function ProductsPage() {
     return `/${wu === '@' ? '@' : wu}`;
   };
 
+  useEnterSubmit(() => { handleSubmit(); }, showForm);
+
   if (loading) return <PageSkeleton type="table" />;
   if (loadError) return <ErrorView error={loadError} onRetry={() => window.location.reload()} />;
 
@@ -369,7 +479,7 @@ export function ProductsPage() {
       ]} />
 
       <div className="mb-4">
-        <FilterPanel storageKey="products"
+        <FilterPanel storageKey="products" toggleOnEvent="fameat:toggle-filters"
           activeCount={pActiveCount}
           onClear={clearPFilters}
           chips={[
@@ -402,7 +512,7 @@ export function ProductsPage() {
       </div>
 
       <div id="products-list" className="bg-white rounded-xl shadow p-4">
-        <ViewToggle storageKey="products"
+        <ViewToggle storageKey="products" searchInputProps={{ 'data-search-input': '' }}
           data={filtered}
           searchFilter={(p, q) => p.name.toLowerCase().includes(q) || (p.category?.name || '').toLowerCase().includes(q)}
           searchPlaceholder="Buscar producto..."
@@ -696,7 +806,26 @@ export function ProductsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Stock actual ({form.saleType === 'UNIT' ? 'uds' : form.weightUnit === '@' ? '@' : form.weightUnit})</label>
-                      <input type="number" step={form.saleType === 'UNIT' ? '1' : '0.001'} min="0" value={form.stockQty} onChange={(e) => setForm({ ...form, stockQty: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
+                      <div className="relative">
+                        <input type="number" step={form.saleType === 'UNIT' ? '1' : '0.001'} value={form.stockQty} onChange={(e) => setForm({ ...form, stockQty: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
+                        {(form.saleType === 'WEIGHT' || form.saleType === 'BOTH') && connected && (
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <span className={`text-xs font-mono font-medium ${stable ? 'text-blue-600' : 'text-yellow-600'}`}>
+                              <Scales size={12} className="inline mr-0.5" />
+                              Balanza: {weight.toFixed(3)} {unit || 'kg'}
+                            </span>
+                            {stable && weight > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setForm({ ...form, stockQty: weight.toFixed(3) })}
+                                className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg hover:bg-blue-200 font-medium transition-colors"
+                              >
+                                Usar este peso
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Stock minimo ({form.saleType === 'UNIT' ? 'uds' : form.weightUnit === '@' ? '@' : form.weightUnit})</label>
@@ -919,6 +1048,32 @@ export function ProductsPage() {
 
             {/* Acciones */}
             <div className="p-4 border-t bg-gray-50 flex gap-2 flex-wrap">
+              {hasRole('ADMIN') && !detailProduct.active && (
+                <>
+                  <button
+                    onClick={() => productRelations?.canDelete && setConfirmDelete(detailProduct.id)}
+                    disabled={!productRelations || !productRelations.canDelete}
+                    className={`inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      productRelations && !productRelations.canDelete
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-red-500 text-white hover:bg-red-600 disabled:opacity-50'
+                    }`}>
+                    <Trash size={16} weight="duotone" /> Eliminar
+                  </button>
+                  {productRelations && !productRelations.canDelete && (
+                    <button onClick={() => setShowRelationsModal(true)}
+                      className="inline-flex items-center justify-center gap-1.5 py-2 px-3 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 text-sm transition-colors">
+                      <Warning size={16} weight="duotone" /> Ver registros ({productRelations.count})
+                    </button>
+                  )}
+                </>
+              )}
+              {hasRole('ADMIN') && detailProduct.active && (
+                <button onClick={() => setConfirmDelete(detailProduct.id)}
+                  className="inline-flex items-center justify-center gap-1.5 py-2 px-3 border border-red-200 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 text-sm transition-colors">
+                  <Prohibit size={16} weight="duotone" /> Desactivar
+                </button>
+              )}
               <button onClick={() => loadPriceHistory(detailProduct.id)}
                 className="inline-flex items-center justify-center gap-1.5 py-2 px-3 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-100 text-sm transition-colors">
                 <ChartLineUp size={16} weight="duotone" /> Historial
@@ -932,6 +1087,82 @@ export function ProductsPage() {
                 className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors"
               >
                 <PencilSimple size={16} weight="duotone" /> Editar
+              </button>
+            </div>
+          </div>
+        </div>
+      </Portal>)}
+
+      {/* Modal registros asociados */}
+      {showRelationsModal && productRelations && detailProduct && (<Portal>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={() => setShowRelationsModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Warning size={20} weight="duotone" className="text-amber-500" />
+                Registros asociados
+              </h3>
+              <button onClick={() => setShowRelationsModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <X size={18} weight="bold" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3 max-h-[65vh] overflow-auto">
+              <p className="text-sm text-gray-500 mb-3">Este producto no se puede eliminar porque tiene registros en los siguientes módulos. Haz clic en cada sección para ver los registros y eliminar los que ya no sean necesarios.</p>
+              <div className="space-y-2">
+                {(Object.entries(productRelations.details) as [string, number][]).filter(([, count]) => count > 0).map(([key, count]) => {
+                  const meta = RELATION_KEYS[key];
+                  const Icon = meta?.icon || Package;
+                  const isExpanded = expandedRel === key;
+                  const records = relRecords[key] || [];
+                  return (
+                    <div key={key} className="bg-gray-50 rounded-lg overflow-hidden">
+                      <button onClick={() => loadRelationRecords(key)} className="w-full flex items-center justify-between p-3 hover:bg-gray-100 transition-colors text-left">
+                        <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <Icon size={16} weight="duotone" className={meta?.color || 'text-gray-500'} />
+                          {meta?.label || key}
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900">{count}</span>
+                          <svg className={`w-4 h-4 text-gray-400 transition-transform ${expandedRel === key ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </span>
+                      </button>
+                      {expandedRel === key && (
+                        <div className="border-t border-gray-200">
+                          {!meta?.deletable ? (
+                            <div className="px-3 py-4 text-center text-xs text-gray-400">
+                              {key === 'saleItems' ? 'Para eliminar este producto debes eliminar las ventas asociadas desde el módulo de ventas.' : ''}
+                              {key === 'purchaseOrderItems' ? 'Para eliminar este producto debes cancelar o recibir las órdenes de compra asociadas.' : ''}
+                            </div>
+                          ) : relLoading ? (
+                            <div className="px-3 py-4 text-center text-xs text-gray-400">Cargando...</div>
+                          ) : records.length === 0 ? (
+                            <div className="px-3 py-4 text-center text-xs text-gray-400">Sin registros</div>
+                          ) : (
+                            <div className="divide-y divide-gray-200">
+                              {records.map((rec: any) => (
+                                <div key={rec.id} className="flex items-center justify-between px-3 py-2 text-xs text-gray-600">
+                                  <span>{formatRelationRecord(key, rec)}</span>
+                                  {meta?.deletable && (
+                                    <button onClick={() => handleDeleteRelationRecord(key, rec.id)}
+                                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                      title="Eliminar">
+                                      <Trash size={13} weight="duotone" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="border-t p-3 flex justify-end">
+              <button onClick={() => setShowRelationsModal(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+                Cerrar
               </button>
             </div>
           </div>
@@ -1037,10 +1268,12 @@ export function ProductsPage() {
 
       <ConfirmModal
         open={confirmDelete !== null}
-        title="Desactivar producto"
-        message="Este producto se marcara como inactivo y no aparecera en el punto de venta."
+        title={products.find(p => p.id === confirmDelete)?.active !== false ? 'Desactivar producto' : 'Eliminar producto'}
+        message={products.find(p => p.id === confirmDelete)?.active !== false
+          ? 'Este producto se marcara como inactivo y no aparecera en el punto de venta.'
+          : 'Este producto no tiene ventas asociadas y se eliminara permanentemente de la base de datos.'}
         variant="danger"
-        confirmText="Desactivar"
+        confirmText={products.find(p => p.id === confirmDelete)?.active !== false ? 'Desactivar' : 'Eliminar'}
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
         onCancel={() => setConfirmDelete(null)}
       />

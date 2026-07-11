@@ -12,6 +12,10 @@ import {
   updateProduct,
   deleteProduct,
   getPriceHistory,
+  getProductSalesCount,
+  deletePriceHistory,
+  mergeProduct,
+  getTopSellers,
 } from "./products.controller";
 
 const uploadsDir = resolveUploadsDir("products");
@@ -28,11 +32,15 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 const router = Router();
 
 router.get("/", authenticate, getProducts);
+router.get("/top-sellers", authenticate, getTopSellers);
 router.get("/:id", authenticate, getProduct);
 router.get("/:id/price-history", authenticate, getPriceHistory);
+router.get("/:id/sales-count", authenticate, getProductSalesCount);
+router.delete("/:id/price-history/:historyId", authenticate, authorize("ADMIN"), deletePriceHistory);
 router.post("/", authenticate, authorize("ADMIN", "SUPERVISOR"), validate(createProductSchema), createProduct);
 router.put("/:id", authenticate, authorize("ADMIN", "SUPERVISOR"), validate(updateProductSchema), updateProduct);
 router.delete("/:id", authenticate, authorize("ADMIN"), deleteProduct);
+router.post("/merge", authenticate, authorize("ADMIN"), mergeProduct);
 
 // Upload imagen de producto
 router.post("/:id/image", authenticate, authorize("ADMIN", "SUPERVISOR"), upload.single("image"), async (req, res) => {

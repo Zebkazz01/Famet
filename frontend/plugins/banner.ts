@@ -35,7 +35,11 @@ export function fameatBanner(): Plugin {
           console.log(`${c.red}${c.bold}  ██╔══╝  ██╔══██║██║╚██╔╝██║██╔══╝  ██╔══██║   ██║   ${c.reset}`);
           console.log(`${c.red}${c.bold}  ██║     ██║  ██║██║ ╚═╝ ██║███████╗██║  ██║   ██║   ${c.reset}`);
           console.log(`${c.red}${c.bold}  ╚═╝     ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝   ╚═╝   ${c.reset}`);
+          const isHttps = !!server.config.server.https;
+          const mode = isHttps ? 'FRONTEND MOVIL' : 'FRONTEND ESCRITORIO';
+          const modeColor = isHttps ? c.green : c.cyan;
           console.log(`${c.dim}  Frontend v1.0.0${c.reset}`);
+          console.log(`  ${c.bold}${modeColor}[ ${mode} ]${c.reset}`);
           console.log("");
           console.log(`  ${c.bold}Dev server listo en ${c.green}${elapsed}ms${c.reset}`);
           console.log("");

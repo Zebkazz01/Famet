@@ -5,6 +5,7 @@ import client from '../api/client';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Portal } from '../components/Portal';
 import { formatDateTime } from '../utils/formatters';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 interface BackupFile { name: string; size: number; modifiedAt: string }
 
@@ -15,6 +16,9 @@ export function BackupsPage() {
   const [restoreText, setRestoreText] = useState('');
   const [dropFirst, setDropFirst] = useState(true);
   const [restoring, setRestoring] = useState(false);
+
+  useModalEscape(confirmRestore ? () => setConfirmRestore(null) : null);
+
   const load = () => client.get('/backup/list').then((r) => setList(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
 
@@ -77,35 +81,49 @@ export function BackupsPage() {
       </div>
 
       <div id="backups-list" className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-slate-900/50">
-            <tr>
-              <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Archivo</th>
-              <th className="text-right px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Tamaño</th>
-              <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Fecha</th>
-              <th className="text-right px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {list.length === 0 && <tr><td colSpan={4} className="text-center text-gray-400 py-8">Sin backups aún</td></tr>}
-            {list.map((b) => (
-              <tr key={b.name} className="hover:bg-gray-50 dark:hover:bg-slate-700/40">
-                <td className="px-3 py-2 font-mono text-xs">
-                  <span className="flex items-center gap-2"><FloppyDisk size={14} weight="duotone" className="text-gray-400" /> {b.name}</span>
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-xs">{fmtSize(b.size)}</td>
-                <td className="px-3 py-2 text-xs text-gray-500">{formatDateTime(b.modifiedAt)}</td>
-                <td className="px-3 py-2 text-right">
-                  <button onClick={() => { setConfirmRestore(b); setRestoreText(''); setDropFirst(true); }}
-                    title="Restaurar este backup"
-                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300">
-                    <ArrowCounterClockwise size={12} weight="bold" /> Restaurar
-                  </button>
-                </td>
+        {list.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4">
+              <Database size={32} weight="duotone" className="text-gray-400" />
+            </div>
+            <p className="font-semibold text-gray-700 dark:text-gray-200 mb-1">Aún no hay backups</p>
+            <p className="text-sm text-gray-400 mb-4">Genera el primer backup para proteger tus datos</p>
+            <button id="backups-btn-empty" onClick={runNow} disabled={running}
+              className="inline-flex items-center gap-1.5 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 disabled:opacity-50 text-sm font-medium transition-colors">
+              <ArrowsClockwise size={16} weight={running ? 'fill' : 'bold'} className={running ? 'animate-spin' : ''} />
+              {running ? 'Generando...' : 'Backup ahora'}
+            </button>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 dark:bg-slate-900/50">
+              <tr>
+                <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Archivo</th>
+                <th className="text-right px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Tamaño</th>
+                <th className="text-left px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Fecha</th>
+                <th className="text-right px-3 py-2 text-[10px] uppercase font-bold text-gray-500">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {list.map((b) => (
+                <tr key={b.name} className="hover:bg-gray-50 dark:hover:bg-slate-700/40">
+                  <td className="px-3 py-2 font-mono text-xs">
+                    <span className="flex items-center gap-2"><FloppyDisk size={14} weight="duotone" className="text-gray-400" /> {b.name}</span>
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-xs">{fmtSize(b.size)}</td>
+                  <td className="px-3 py-2 text-xs text-gray-500">{formatDateTime(b.modifiedAt)}</td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => { setConfirmRestore(b); setRestoreText(''); setDropFirst(true); }}
+                      title="Restaurar este backup"
+                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300">
+                      <ArrowCounterClockwise size={12} weight="bold" /> Restaurar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Modal confirmación restore */}

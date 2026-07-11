@@ -41,7 +41,6 @@ export function useConfigVersion() {
 
   useEffect(() => {
     const socket = getRootSocket();
-    if (!socket) return; // Demo mode - no WebSocket
 
     const onUpdate = (payload: ConfigUpdatedPayload) => {
       const newVersion = payload.configVersion;

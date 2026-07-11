@@ -12,6 +12,8 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Portal } from '../components/Portal';
 import { FilterPanel, Combobox } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
+import { useEnterSubmit } from '../hooks/useEnterSubmit';
+import { useModalEscape } from '../contexts/ModalStackContext';
 
 interface Supplier {
   id: number;
@@ -41,6 +43,10 @@ export function SuppliersPage() {
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
+
+  useModalEscape(showForm ? () => setShowForm(false) : null);
+  useModalEscape(detail ? () => setDetail(null) : null);
+
   const { filters, setFilter, clear, activeCount } = useTableFilters<{ city: string; active: string; sort: string }>({
     city: '',
     active: '',
@@ -75,8 +81,8 @@ export function SuppliersPage() {
 
   useEffect(load, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     const payload = {
       ...form,
       nit: form.nit || null,
@@ -125,6 +131,8 @@ export function SuppliersPage() {
     load();
   };
 
+  useEnterSubmit(() => { handleSubmit(); }, showForm);
+
   if (loading) return <PageSkeleton type="table" />;
   if (loadError) return <ErrorView error={loadError} onRetry={() => window.location.reload()} />;
 
@@ -153,7 +161,7 @@ export function SuppliersPage() {
       ]} />
 
       <div className="mb-4">
-        <FilterPanel storageKey="suppliers"
+        <FilterPanel storageKey="suppliers" toggleOnEvent="fameat:toggle-filters"
           activeCount={activeCount}
           onClear={clear}
           chips={[
@@ -191,7 +199,7 @@ export function SuppliersPage() {
       </div>
 
       <div id="suppliers-list" className="bg-white rounded-xl shadow p-4">
-        <ViewToggle storageKey="suppliers"
+        <ViewToggle storageKey="suppliers" searchInputProps={{ 'data-search-input': '' }}
           data={filteredSuppliers}
           searchFilter={(s, q) => s.name.toLowerCase().includes(q) || (s.nit || '').includes(q) || (s.city || '').toLowerCase().includes(q)}
           searchPlaceholder="Buscar proveedor..."
