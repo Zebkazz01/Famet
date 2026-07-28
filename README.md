@@ -11,7 +11,7 @@
 ![TypeScript](https://img.shields.io/badge/typescript-5.8-3178C6?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/postgresql-14%2B-4169E1?style=for-the-badge)
 
-[English](#english) | [Español](#español)
+[English](#english) | [Español](#español) | [Índice (ES)](#-índice-es) | [Index (EN)](#-table-of-contents-en)
 
 ---
 
@@ -26,13 +26,30 @@
 > Si aún no tienes el GIF, puedes usar la imagen estática como placeholder:
 > ![FAMEAT POS Preview](preview.png)
 
-**🔗 [Demo en vivo → famet-frontend.vercel.app](https://famet-frontend.vercel.app)**
+**🔗 [Demo en vivo → famet-backend-iota.vercel.app](https://famet-backend-iota.vercel.app)**
 
 </div>
 
 ---
 
 # Español
+
+## 📋 Índice
+
+1. [¿Por qué existe?](#por-qué-existe-fameat-pos)
+2. [Características principales](#características-principales)
+3. [Stack Tecnológico](#stack-tecnológico)
+4. [Decisiones de arquitectura](#decisiones-de-arquitectura)
+5. [Instalación](#instalación)
+6. [Estructura del Proyecto](#estructura-del-proyecto)
+7. [Ejemplos de Código](#ejemplos-de-código)
+8. [Testing](#testing)
+9. [Configuración](#configuración)
+10. [Desarrollo](#desarrollo)
+11. [Futuras Mejoras](#futuras-mejoras)
+12. [Licencia](#licencia)
+
+---
 
 ## ¿Por qué existe FAMEAT POS?
 
@@ -395,6 +412,23 @@ Este proyecto está bajo la licencia MIT. Ver [LICENSE](LICENSE) para más detal
 ---
 
 # English
+
+## 📋 Table of Contents
+
+1. [Why does it exist?](#why-does-fameat-pos-exist)
+2. [Key Features](#key-features)
+3. [Tech Stack](#tech-stack)
+4. [Architecture Decisions](#architecture-decisions)
+5. [Installation](#installation)
+6. [Project Structure](#project-structure)
+7. [Code Examples](#code-examples)
+8. [Testing](#testing-1)
+9. [Configuration](#configuration)
+10. [Development](#development)
+11. [Future Improvements](#future-improvements)
+12. [License](#license-1)
+
+---
 
 ## Why does FAMEAT POS exist?
 
