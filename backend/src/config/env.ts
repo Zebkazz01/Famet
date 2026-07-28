@@ -16,6 +16,7 @@ const envSchema = z.object({
   BUSINESS_NAME: z.string().default("POS"),
   BUSINESS_ADDRESS: z.string().default(""),
   BUSINESS_PHONE: z.string().default(""),
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
 export const env = envSchema.parse(process.env);

@@ -7,6 +7,9 @@ import { Server as SocketServer } from "socket.io";
 import jwt from "jsonwebtoken";
 import { env } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler";
+import { setupSwagger } from "./config/swagger";
+import { setupSecurity } from "./middleware/security";
+import { requestLogger } from "./middleware/requestLogger";
 import { ScaleManager } from "./scale/scaleManager";
 import { setupScaleSocket } from "./scale/scaleSocket";
 import { log, printBanner, printRoutes, printScaleStatus, printDbStatus, printShutdown } from "./config/logger";
@@ -124,6 +127,15 @@ app.get("/api/network", (_req, res) => {
     hostname: os.hostname(),
   });
 });
+
+// Security headers + rate limiting
+setupSecurity(app);
+
+// Request logging
+app.use(requestLogger);
+
+// API Docs (Swagger)
+setupSwagger(app);
 
 // Rutas API
 app.use("/api/auth", authRoutes);
@@ -330,8 +342,18 @@ if (process.env.SERVE_FRONTEND !== "false") {
     process.env.FRONTEND_DIST || path.join(__dirname, "..", "..", "frontend", "dist"),
   );
   if (fs.existsSync(frontendDist)) {
-    app.use(express.static(frontendDist));
-    app.get(/^\/(?!api|uploads|socket\.io).*/, (_req, res) => {
+    app.use(express.static(frontendDist, {
+      index: false,
+      setHeaders(res, filePath) {
+        if (/\/assets\/.*\.[a-f0-9]{8}\.(js|css)$/i.test(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+        }
+      },
+    }));
+    // SPA catch-all: solo para navegacion (no assets, no api, no uploads, no socket)
+    app.get(/^\/(?!api|uploads|socket\.io|assets\/).*/, (_req, res) => {
       res.sendFile(path.join(frontendDist, "index.html"));
     });
     log.info(`[server] sirviendo frontend desde ${frontendDist}`);

@@ -4,6 +4,7 @@
 
 ### Punto de Venta completo para carnicerías, restaurantes y negocios que manejan productos por peso
 
+![CI](https://img.shields.io/github/actions/workflow/status/Zebkazz01/Famet/ci.yml?branch=main&label=CI&style=for-the-badge)
 ![Version](https://img.shields.io/badge/version-1.3.0-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 ![Node](https://img.shields.io/badge/node-20%2B-brightgreen?style=for-the-badge)
@@ -131,6 +132,26 @@ FAMEAT POS nació de una necesidad real: las carnicerías y minimercados en Lati
 **¿Por qué monorepo con npm workspaces?** El frontend y backend comparten tipos (interfaces de API, enums de roles) y se despliegan juntos. Un monorepo simplifica el desarrollo local (`npm run dev` arranca ambos) y evita la duplicación de configuración de TypeScript/ESLint.
 
 **¿Por qué Express en vez de Fastify/NestJS?** Para este volumen (un solo negocio, no SaaS multi-tenant), Express es suficiente y tiene el ecosistema más amplio. NestJS añade complejidad innecesaria para una app que no escala a miles de usuarios concurrentes.
+
+**¿Por qué React Context en vez de Redux/Zustand?** Usamos React Context para autenticación, tema y estado global ligero. Para datos en tiempo real usamos Socket.IO con hooks personalizados. No implementamos Zustand/Redux aún porque la app no presenta problemas de prop drilling ni re-renderizados innecesarios. Si escalamos a multi-sucursal, evaluaremos migración.
+
+---
+
+## Seguridad
+
+| Medida | Estado | Detalle |
+|--------|--------|---------|
+| Autenticación JWT | ✅ Implementado | Tokens con expiración configurable (`JWT_EXPIRES_IN`) |
+| Validación de inputs | ✅ Implementado | Zod schema validation en cada endpoint público |
+| SQL injection | ✅ Mitigado | Prisma ORM genera queries parameterizadas |
+| Password hashing | ✅ Implementado | bcrypt con salt rounds |
+| Security headers | ✅ Implementado | Helmet (X-Content-Type-Options, HSTS, X-Frame-Options) |
+| Rate limiting | ✅ Implementado | express-rate-limit: 100 req/15min global, 10 req/15min en auth |
+| CORS | ⚠️ Permisivo | Abierto en desarrollo; restringir en producción |
+| Feature flags | 📋 Futuro | Para gradual rollout de funcionalidades |
+| Migraciones zero-downtime | 📋 Futuro | Estrategia: `prisma migrate deploy` + blue-green deploy |
+
+> **Endpoints de salud:** `GET /api/health` (estado de DB, balanza, uptime) y `GET /api/network` (IP LAN para acceso desde celular).
 
 ---
 
@@ -304,7 +325,7 @@ npm test                    # Ejecutar todos los tests
 npm run test:watch          # Modo watch (desarrollo)
 ```
 
-### Cobertura actual
+### Cobertura actual (136 tests)
 
 | Archivo | Tests | Qué valida |
 |---------|-------|------------|
@@ -312,16 +333,24 @@ npm run test:watch          # Modo watch (desarrollo)
 | `modules/discounts/discountEngine.ts` | 14 | Reglas de descuento: QUANTITY_THRESHOLD, PERCENTAGE, BUY_X_GET_Y, FIXED_AMOUNT, prioridad, expiración |
 | `utils/businessDay.ts` | 19 | Lógica de día laboral (07:00-06:59), bordes de mes/año, parseo de fechas |
 | `middleware/auth.ts` | 11 | JWT authenticate + authorize (tokens válidos, expirados, roles) |
-| `modules/sales/sales.schema.ts` | 10 | Validación Zod de ventas (items, pagos, crédito, defaults) |
+| `modules/sales/sales.schema.ts` | 12 | Validación Zod de ventas (items, pagos, crédito, defaults, edición) |
 | `modules/auth/auth.schema.ts` | 4 | Validación de login (campos requeridos) |
+| `modules/inventory/inventory.schema.ts` | 10 | Validación de movimientos (ENTRY, ADJUSTMENT, LOSS, RETURN) |
+| `modules/cash/cash.schema.ts` | 12 | Validación de movimientos de caja + cierres |
+| `modules/customers/customers.schema.ts` | 12 | Clientes, pagos parciales, límites de crédito |
+| `modules/auth/auth.controller.test.ts` | 10 | JWT token generation + bcrypt password hashing |
+| `modules/products/products.test.ts` | 13 | Validación de productos (nombre, precio, tipo de venta) |
 
 ### Próximos tests a implementar
 
 | Módulo | Tipo | Prioridad |
 |--------|------|-----------|
-| Inventario / Lotes | Unit + Integration | Alta |
-| Caja / Arqueo | Integration | Media |
-| Frontend (componentes) | E2E con Playwright | Baja |
+| Frontend (componentes) | E2E con Playwright | Alta |
+| Integración API completa | Integration | Media |
+
+### API Docs
+
+Documentación interactiva disponible en **`/api/docs`** (Swagger UI) cuando el servidor está corriendo.
 
 ---
 
@@ -388,12 +417,16 @@ npm run dev
 
 ## Futuras mejoras
 
-- [ ] **Tests automatizados** — Vitest + Playwright
+- [x] **Tests automatizados** — Vitest (136 tests unitarios)
+- [x] **API docs** — Swagger UI en `/api/docs`
+- [x] **Security headers** — Helmet + rate limiting
+- [ ] **E2E tests** — Playwright para flujo completo de venta
+- [ ] **Feature flags** — Para gradual rollout de funcionalidades sin redeploy
+- [ ] **Migraciones zero-downtime** — Estrategia: `prisma migrate deploy` + blue-green deploy
 - [ ] **Multi-sucursal** — Soporte para múltiples tiendas
 - [ ] **App móvil nativa** — React Native para iOS/Android
 - [ ] **Pasarelas de pago** — Integración con Stripe, MercadoPago
 - [ ] **Modo offline** — Funcionamiento sin conexión
-- [ ] **API pública** — Documentación OpenAPI/Swagger
 - [ ] **Fidelización** — Programa de puntos y recompensas
 
 ---
@@ -510,6 +543,26 @@ FAMEAT POS was built from a real need: butcher shops and convenience stores in L
 **Why monorepo with npm workspaces?** Frontend and backend share types (API interfaces, role enums) and deploy together. A monorepo simplifies local development (`npm run dev` starts both) and avoids duplicating TypeScript/ESLint configuration.
 
 **Why Express instead of Fastify/NestJS?** For this volume (a single business, not a multi-tenant SaaS), Express is sufficient and has the widest ecosystem. NestJS adds unnecessary complexity for an app that won't scale to thousands of concurrent users.
+
+**Why React Context instead of Redux/Zustand?** We use React Context for authentication, theme, and lightweight global state. For real-time data we use Socket.IO with custom hooks. We haven't implemented Zustand/Redux yet because the app doesn't have prop drilling or unnecessary re-render issues. If we scale to multi-store, we'll evaluate migration.
+
+---
+
+## Security
+
+| Measure | Status | Details |
+|---------|--------|---------|
+| JWT Authentication | ✅ Implemented | Tokens with configurable expiration (`JWT_EXPIRES_IN`) |
+| Input Validation | ✅ Implemented | Zod schema validation on every public endpoint |
+| SQL Injection | ✅ Mitigated | Prisma ORM generates parameterized queries |
+| Password Hashing | ✅ Implemented | bcrypt with salt rounds |
+| Security Headers | ✅ Implemented | Helmet (X-Content-Type-Options, HSTS, X-Frame-Options) |
+| Rate Limiting | ✅ Implemented | express-rate-limit: 100 req/15min global, 10 req/15min on auth |
+| CORS | ⚠️ Permissive | Open in development; restrict in production |
+| Feature Flags | 📋 Future | For gradual feature rollout |
+| Zero-downtime Migrations | 📋 Future | Strategy: `prisma migrate deploy` + blue-green deploy |
+
+> **Health endpoints:** `GET /api/health` (DB, scale, uptime status) and `GET /api/network` (LAN IP for mobile access).
 
 ---
 
@@ -683,7 +736,7 @@ npm test                    # Run all tests
 npm run test:watch          # Watch mode (development)
 ```
 
-### Current coverage
+### Current coverage (136 tests)
 
 | File | Tests | What it validates |
 |------|-------|-------------------|
@@ -691,16 +744,24 @@ npm run test:watch          # Watch mode (development)
 | `modules/discounts/discountEngine.ts` | 14 | Discount rules: QUANTITY_THRESHOLD, PERCENTAGE, BUY_X_GET_Y, FIXED_AMOUNT, priority, expiration |
 | `utils/businessDay.ts` | 19 | Business day logic (07:00-06:59), month/year boundaries, date parsing |
 | `middleware/auth.ts` | 11 | JWT authenticate + authorize (valid, expired, roles) |
-| `modules/sales/sales.schema.ts` | 10 | Zod validation for sales (items, payments, credit, defaults) |
+| `modules/sales/sales.schema.ts` | 12 | Zod validation for sales (items, payments, credit, defaults, update) |
 | `modules/auth/auth.schema.ts` | 4 | Login validation (required fields) |
+| `modules/inventory/inventory.schema.ts` | 10 | Inventory movement validation (ENTRY, ADJUSTMENT, LOSS, RETURN) |
+| `modules/cash/cash.schema.ts` | 12 | Cash movement + closing validation |
+| `modules/customers/customers.schema.ts` | 12 | Customers, partial payments, credit limits |
+| `modules/auth/auth.controller.test.ts` | 10 | JWT token generation + bcrypt password hashing |
+| `modules/products/products.test.ts` | 13 | Product validation (name, price, sale type) |
 
 ### Next tests to implement
 
 | Module | Type | Priority |
 |--------|------|----------|
-| Inventory / Batches | Unit + Integration | High |
-| Cash Register | Integration | Medium |
-| Frontend (components) | E2E with Playwright | Low |
+| Frontend (components) | E2E with Playwright | High |
+| Full API Integration | Integration | Medium |
+
+### API Docs
+
+Interactive documentation available at **`/api/docs`** (Swagger UI) when the server is running.
 
 ---
 
