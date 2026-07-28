@@ -79,7 +79,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       }
       // Title dinámico con businessName
       const bizName = data.business_name || defaults.businessName;
-      document.title = `${bizName} - ByteGest POS`;
+      document.title = `${bizName} - FAMEAT POS`;
       const appleTitle = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
       if (appleTitle) appleTitle.content = bizName;
       // Manifest dinámico con nombre del negocio + logo
