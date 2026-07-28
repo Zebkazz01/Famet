@@ -286,26 +286,32 @@ export class ScaleManager extends EventEmitter {
 
 ## Testing
 
-> **Este proyecto aún no tiene tests automatizados.** La cobertura de tests es una mejora planificada.
-
-### Plan de testing
-
-| Módulo | Tipo de test | Prioridad |
-|--------|-------------|-----------|
-| Ventas (POS) | Unit + Integration | Alta |
-| Inventario / Lotes | Unit + Integration | Alta |
-| Balanza (ScaleManager) | Unit (mock serial) | Media |
-| Caja / Arqueo | Integration | Media |
-| Auth / Roles | Unit + Integration | Alta |
-| Frontend (componentes) | E2E con Playwright | Baja |
+Tests unitarios con **Vitest** — ejecutados sin base de datos ni servicios externos.
 
 ```bash
-# Cuando se implementen:
+cd backend
 npm test                    # Ejecutar todos los tests
-npm run test:coverage       # Cobertura de código
+npm run test:watch          # Modo watch (desarrollo)
 ```
 
-Si quieres contribuir con tests, los frameworks recomendados son **Vitest** (unit/integration) y **Playwright** (E2E), alineados con el stack existente.
+### Cobertura actual
+
+| Archivo | Tests | Qué valida |
+|---------|-------|------------|
+| `scale/scaleParser.ts` | 19 | Parsing de 3 protocolos de balanza (ST/US, =/+, numérico puro) |
+| `modules/discounts/discountEngine.ts` | 14 | Reglas de descuento: QUANTITY_THRESHOLD, PERCENTAGE, BUY_X_GET_Y, FIXED_AMOUNT, prioridad, expiración |
+| `utils/businessDay.ts` | 19 | Lógica de día laboral (07:00-06:59), bordes de mes/año, parseo de fechas |
+| `middleware/auth.ts` | 11 | JWT authenticate + authorize (tokens válidos, expirados, roles) |
+| `modules/sales/sales.schema.ts` | 10 | Validación Zod de ventas (items, pagos, crédito, defaults) |
+| `modules/auth/auth.schema.ts` | 4 | Validación de login (campos requeridos) |
+
+### Próximos tests a implementar
+
+| Módulo | Tipo | Prioridad |
+|--------|------|-----------|
+| Inventario / Lotes | Unit + Integration | Alta |
+| Caja / Arqueo | Integration | Media |
+| Frontend (componentes) | E2E con Playwright | Baja |
 
 ---
 
@@ -642,26 +648,32 @@ export class ScaleManager extends EventEmitter {
 
 ## Testing
 
-> **This project does not have automated tests yet.** Test coverage is a planned improvement.
-
-### Testing plan
-
-| Module | Test type | Priority |
-|--------|-----------|----------|
-| Sales (POS) | Unit + Integration | High |
-| Inventory / Batches | Unit + Integration | High |
-| Scale (ScaleManager) | Unit (mock serial) | Medium |
-| Cash Register | Integration | Medium |
-| Auth / Roles | Unit + Integration | High |
-| Frontend (components) | E2E with Playwright | Low |
+Unit tests with **Vitest** — runs without database or external services.
 
 ```bash
-# When implemented:
+cd backend
 npm test                    # Run all tests
-npm run test:coverage       # Code coverage
+npm run test:watch          # Watch mode (development)
 ```
 
-Recommended frameworks: **Vitest** (unit/integration) and **Playwright** (E2E), aligned with the existing stack.
+### Current coverage
+
+| File | Tests | What it validates |
+|------|-------|-------------------|
+| `scale/scaleParser.ts` | 19 | Parsing 3 scale protocols (ST/US, =/+, raw numeric) |
+| `modules/discounts/discountEngine.ts` | 14 | Discount rules: QUANTITY_THRESHOLD, PERCENTAGE, BUY_X_GET_Y, FIXED_AMOUNT, priority, expiration |
+| `utils/businessDay.ts` | 19 | Business day logic (07:00-06:59), month/year boundaries, date parsing |
+| `middleware/auth.ts` | 11 | JWT authenticate + authorize (valid, expired, roles) |
+| `modules/sales/sales.schema.ts` | 10 | Zod validation for sales (items, payments, credit, defaults) |
+| `modules/auth/auth.schema.ts` | 4 | Login validation (required fields) |
+
+### Next tests to implement
+
+| Module | Type | Priority |
+|--------|------|----------|
+| Inventory / Batches | Unit + Integration | High |
+| Cash Register | Integration | Medium |
+| Frontend (components) | E2E with Playwright | Low |
 
 ---
 

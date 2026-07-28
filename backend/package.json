@@ -27,7 +27,9 @@
     "backup:run": "tsx src/cli/backup-cli.ts run",
     "backup:list": "tsx src/cli/backup-cli.ts list",
     "backup:restore": "tsx src/cli/backup-cli.ts restore",
-    "backup:help": "tsx src/cli/backup-cli.ts help"
+    "backup:help": "tsx src/cli/backup-cli.ts help",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
@@ -57,6 +59,7 @@
     "@types/pdfkit": "^0.13.8",
     "prisma": "^6.5.0",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "^4.1.10"
   }
 }

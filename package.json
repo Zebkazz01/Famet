@@ -32,6 +32,8 @@
     "backup:list": "npm run backup:list --workspace=backend",
     "backup:restore": "npm run backup:restore --workspace=backend",
     "backup:help": "npm run backup:help --workspace=backend",
+    "test": "npm test --workspace=backend",
+    "test:watch": "npm run test:watch --workspace=backend",
     "release": "standard-version",
     "release:minor": "standard-version --release-as minor",
     "release:major": "standard-version --release-as major"
