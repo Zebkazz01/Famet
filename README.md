@@ -2,7 +2,7 @@
 
 # 🥩 FAMEAT POS
 
-### Sistema de Punto de Venta | Point of Sale System
+### Punto de Venta completo para carnicerías, restaurantes y negocios que manejan productos por peso
 
 ![Version](https://img.shields.io/badge/version-1.3.0-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
@@ -11,17 +11,22 @@
 ![TypeScript](https://img.shields.io/badge/typescript-5.8-3178C6?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/postgresql-14%2B-4169E1?style=for-the-badge)
 
-**Punto de venta completo para carnicerías, restaurantes y negocios que manejan productos por peso.**
-
-**Complete point of sale for butcher shops, restaurants, and businesses handling products by weight.**
-
 [English](#english) | [Español](#español)
 
 ---
 
-**Preview de la Aplicación / Application Preview**
+**🎬 Demo en vivo**
 
-![FAMEAT POS Preview](preview.png)
+> **Reemplaza el GIF de abajo con una grabación de 10-15 segundos mostrando: escanear producto → pesar en balanza → agregar al carrito → cobrar → ticket impreso.**
+>
+> Para crear el GIF: graba tu pantalla con [LICEcap](https://www.cockos.com/licecap/) o [ScreenToGif](https://www.screentogif.com/), reducelo a 600-800px de ancho y comprímelo con [ezgif.com](https://ezgif.com/optimize) a menos de 3MB.
+
+![FAMEAT POS Demo](demo.gif)
+
+> Si aún no tienes el GIF, puedes usar la imagen estática como placeholder:
+> ![FAMEAT POS Preview](preview.png)
+
+**🔗 [Demo en vivo → famet-frontend.vercel.app](https://famet-frontend.vercel.app)**
 
 </div>
 
@@ -29,39 +34,27 @@
 
 # Español
 
-## 📋 Índice
+## ¿Por qué existe FAMEAT POS?
 
-1. [Descripción](#descripción)
-2. [Características](#características)
-3. [Stack Tecnológico](#stack-tecnológico)
-4. [Instalación](#instalación)
-5. [Estructura del Proyecto](#estructura-del-proyecto)
-6. [Funcionalidades](#funcionalidades)
-7. [Ejemplos de Código](#ejemplos-de-código)
-8. [Configuración](#configuración)
-9. [Backups](#backups)
-10. [Desarrollo](#desarrollo)
-11. [Futuras Mejoras](#futuras-mejoras)
-12. [Licencia](#licencia)
+FAMEAT POS nació de una necesidad real: las carnicerías y minimercados en Latinoamérica necesitan un sistema POS que entienda que **el producto se vende por peso**, no por unidad. La mayoría de los sistemas existentes son genéricos (cajas registradoras, Shopify POS, etc.) y no resuelven la integración directa con una balanza USB, el control de lotes con vencimiento, o el crédito a clientes con seguimiento FIFO. Este sistema está diseñado desde cero para ese flujo específico.
 
 ---
 
-## Descripción
+## Características principales
 
-**FAMEAT POS** es un sistema completo de punto de venta diseñado específicamente para carnicerías, restaurantes y negocios que manejan productos por peso. Integra una balanza digital, gestión de inventario, ventas, caja, clientes con crédito, proveedores y reportes detallados.
+| | |
+|---|---|
+| ⚖️ **Balanza USB integrada** | Conexión directa con balanzas CH340 — peso en tiempo real sin clics extra |
+| 📦 **Inventario por lotes** | Control de stock con fechas de vencimiento y movimientos (entradas, salidas, pérdidas) |
+| 👥 **Crédito a clientes** | Límite de crédito, pagos parciales con seguimiento FIFO, historial completo |
+| 💰 **Caja diaria** | Apertura, movimientos, arqueo y gastos operativos |
+| 📱 **PWA instalable** | Funciona como app en Android, iPhone y PC — sin app store |
+| 🔒 **Roles granulares** | ADMIN, SUPERVISOR, VENDEDOR con permisos por módulo |
+| 📊 **Reportes + Excel** | Ventas, inventario, financieros — exportables a hojas de cálculo |
+| 🖨️ **Tickets PDF** | Generados con PDFKit, personalizables con logo del negocio |
 
-El sistema funciona como una **PWA (Progressive Web App)** instalable en dispositivos móviles y de escritorio, permitiendo acceso desde cualquier dispositivo en la red local.
-
-### ¿Para quién es?
-
-- **Carnicerías**: Control de productos por peso con balanza digital
-- **Restaurantes**: Gestión de inventario y ventas en tiempo real
-- **Minimercados**: Control de stock, clientes y proveedores
-- **Negocios de alimentos**: Seguimiento de vencimiento y lotes
-
----
-
-## Características
+<details>
+<summary><strong>Ver todas las funcionalidades (15)</strong></summary>
 
 | Característica | Descripción |
 |----------------|-------------|
@@ -81,18 +74,13 @@ El sistema funciona como una **PWA (Progressive Web App)** instalable en disposi
 | 📈 **Reportes** | Ventas, inventario, financieros y Excel |
 | 🔍 **Código de Barras** | Escáner integrado con cámara o dispositivo USB |
 
+</details>
+
 ---
 
 ## Stack Tecnológico
 
 ### Arquitectura
-
-| Patrón | Descripción |
-|--------|-------------|
-| **Stack** | **PERN** (PostgreSQL, Express, React, Node.js) |
-| **Patrón Backend** | **Arquitectura Modular** (controller + routes + schema por módulo) |
-| **Patrón Frontend** | **Component-Based** (React Context + Custom Hooks + Pages) |
-| **Monorepo** | npm workspaces (backend + frontend) |
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -110,45 +98,29 @@ El sistema funciona como una **PWA (Progressive Web App)** instalable en disposi
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Backend
-
-| Componente | Tecnología | Versión |
-|------------|------------|---------|
+| Capa | Tecnología | Versión |
+|------|------------|---------|
 | Runtime | Node.js | 20+ |
 | Lenguaje | TypeScript | 5.8 |
-| Framework | Express | 4.21 |
+| Backend Framework | Express | 4.21 |
 | ORM | Prisma | 6.5 |
-| Base de Datos | PostgreSQL | 14+ |
-| Autenticación | JWT (jsonwebtoken) | 9.0 |
+| Base de datos | PostgreSQL | 14+ |
+| Auth | JWT | 9.0 |
 | Real-time | Socket.IO | 4.8 |
-| PDF | PDFKit | 0.16 |
-| Balanza | Serialport | 12.0 |
-| Validación | Zod | 3.24 |
-| Excel | ExcelJS | 4.4 |
-
-### Frontend
-
-| Componente | Tecnología | Versión |
-|------------|------------|---------|
-| Framework | React | 19.2 |
+| Frontend Framework | React | 19.2 |
 | Bundler | Vite | 7.3 |
 | CSS | Tailwind CSS | 4.2 |
-| Rutas | React Router DOM | 7.13 |
-| HTTP Client | Axios | 1.13 |
-| Gráficas | Recharts / ApexCharts | 3.7 / 5.13 |
-| Iconos | Phosphor Icons | 2.1 |
-| Notificaciones | React Hot Toast | 2.6 |
-| Scanner | html5-qrcode / @zxing | 2.3 / 0.22 |
+| Monorepo | npm workspaces | — |
 
-### Infraestructura
+---
 
-| Componente | Tecnología |
-|------------|------------|
-| Monorepo | npm workspaces |
-| Versionado | standard-version |
-| PWA | Service Worker + Manifest |
-| HTTPS | mkcert (certificados locales) |
-| Drivers | CH340 USB-Serial |
+## Decisiones de arquitectura
+
+**¿Por qué PostgreSQL + Prisma en vez de MongoDB?** Las relaciones entre ventas → inventario → clientes → caja requieren integridad referencial real. Una venta afecta el stock, el saldo del cliente y el estado de la caja en una transacción. MongoDB exige lógica de consistencia en la aplicación; PostgreSQL la garantiza a nivel de base de datos.
+
+**¿Por qué monorepo con npm workspaces?** El frontend y backend comparten tipos (interfaces de API, enums de roles) y se despliegan juntos. Un monorepo simplifica el desarrollo local (`npm run dev` arranca ambos) y evita la duplicación de configuración de TypeScript/ESLint.
+
+**¿Por qué Express en vez de Fastify/NestJS?** Para este volumen (un solo negocio, no SaaS multi-tenant), Express es suficiente y tiene el ecosistema más amplio. NestJS añade complejidad innecesaria para una app que no escala a miles de usuarios concurrentes.
 
 ---
 
@@ -179,12 +151,11 @@ npm start
 ### Acceso
 
 - **URL**: http://localhost:3001
-- **Usuario**: `admin`
-- **Contraseña**: `admin123`
+- **Credenciales**: Las credenciales de acceso inicial se generan automáticamente durante el seed (`npm run db:seed`). Consulta [INSTALL.md](INSTALL.md) para el detalle de los usuarios por defecto y cómo personalizarlos.
 
 ### Instalación Detallada
 
-Para instrucciones completas, ver [INSTALL.md](INSTALL.md)
+Para instrucciones completas (HTTPS, PWA, acceso LAN, backups), ver [INSTALL.md](INSTALL.md)
 
 ---
 
@@ -205,114 +176,32 @@ fameat/
 │   │   │   ├── cash/           # Caja
 │   │   │   ├── customers/      # Clientes
 │   │   │   ├── suppliers/      # Proveedores
-│   │   │   ├── categories/     # Categorías
-│   │   │   ├── expenses/       # Gastos
-│   │   │   ├── reports/        # Reportes
-│   │   │   ├── notifications/  # Notificaciones
 │   │   │   └── ...             # Otros módulos
 │   │   ├── jobs/               # Tareas programadas (cron)
-│   │   ├── cli/                # Herramientas de línea de comandos
-│   │   ├── pdf/                # Generación de PDFs
 │   │   ├── scale/              # Integración con balanza
+│   │   ├── pdf/                # Generación de PDFs
 │   │   └── realtime/           # Socket.IO
-│   ├── uploads/                # Imágenes y archivos
-│   └── .env                    # Variables de entorno
+│   └── uploads/                # Imágenes y archivos
 │
 ├── frontend/                   # React + Vite + Tailwind
 │   ├── src/
 │   │   ├── pages/              # 15 páginas principales
 │   │   ├── components/         # Componentes reutilizables
-│   │   │   ├── ui/             # Botones, inputs, cards, etc.
-│   │   │   ├── layout/         # Header, Sidebar, Footer
-│   │   │   └── products/       # Componentes específicos
 │   │   ├── contexts/           # React Context (Auth, Theme, etc.)
 │   │   ├── hooks/              # Custom hooks
-│   │   ├── api/                # Clientes API
-│   │   ├── utils/              # Utilidades
-│   │   └── pwa/                # PWA features
-│   ├── public/                 # Assets estáticos
-│   └── dist/                   # Build de producción
+│   │   └── api/                # Clientes API
+│   └── public/                 # Assets estáticos + PWA
 │
 ├── scripts/                    # Scripts de utilería
 ├── drivers/                    # Drivers CH340 (balanza)
-├── POS.bat                     # Lanzador Windows
-├── setup.ps1                   # Instalador Windows
-└── setup.sh                    # Instalador Linux/Mac
+└── POS.bat                     # Lanzador Windows
 ```
-
----
-
-## Funcionalidades
-
-### Punto de Venta (POS)
-
-El módulo principal permite realizar ventas de forma rápida e intuitiva:
-
-- **Búsqueda de productos**: Por nombre, código de barras o categoría
-- **Balanza integrada**: Peso en tiempo real desde la balanza USB
-- **Carrito de compras**: Agregar, modificar cantidades, eliminar items
-- **Múltiples formas de pago**: Efectivo, tarjeta, transferencia
-- **Descuentos**: Automáticos por cantidad o manuales
-- **Crédito a clientes**: Venta a crédito con seguimiento
-
-```typescript
-// Ejemplo: Conexión con balanza
-const scale = new ScaleManager({
-  port: process.env.SCALE_PORT || 'COM3',
-  baudRate: parseInt(process.env.SCALE_BAUD_RATE || '9600')
-});
-
-scale.on('weight', (weight) => {
-  // Actualizar peso en la UI en tiempo real
-  io.emit('scale:weight', weight);
-});
-```
-
-### Gestión de Inventario
-
-Control completo del stock de productos:
-
-- **Movimientos**: Entradas, salidas, ajustes, pérdidas, devoluciones
-- **Lotes**: Seguimiento por lote con fechas de vencimiento
-- **Alertas**: Notificaciones de stock bajo y productos próximos a vencer
-- **Historial**: Registro completo de cada movimiento
-
-### Sistema de Clientes
-
-Gestión de clientes con sistema de crédito:
-
-- **Crédito**: Límite de crédito por cliente
-- **Pagos parciales**: Abonos con seguimiento FIFO
-- **Descuentos**: Descuento porcentual por cliente
-- **Historial**: Todas las ventas y pagos de cada cliente
-
-### Proveedores y Órdenes de Compra
-
-- **Catálogo de proveedores**: Datos de contacto y productos
-- **Órdenes de compra**: Flujo DRAFT → SENT → RECEIVED
-- **Recepción**: Genera movimiento de inventario automáticamente
-- **Adjuntos**: Facturas escaneadas del proveedor
-
-### Caja y Finanzas
-
-- **Apertura/Cierre**: Control diario de caja
-- **Movimientos**: Entradas y salidas con motivo
-- **Arqueo**: Comparación entre esperado y real
-- **Gastos**: Registro categorizado de gastos operativos
-
-### Reportes
-
-- **Ventas**: Por período, categoría, método de pago
-- **Inventario**: Stock actual, valorización, rotación
-- **Financieros**: Ingresos, gastos, utilidad neta
-- **Excel**: Exportación a hojas de cálculo
-- **PDFs**: Tickets y reportes detallados
 
 ---
 
 ## Ejemplos de Código
 
-### Backend - Ruta API con Autenticación
+### Ruta API con autenticación y validación
 
 ```typescript
 // backend/src/modules/products/products.routes.ts
@@ -323,7 +212,6 @@ import { productSchema } from './products.schema';
 
 const router = Router();
 
-// GET /api/products - Listar productos activos
 router.get('/', authenticate, async (req, res) => {
   const products = await prisma.product.findMany({
     where: { active: true },
@@ -333,11 +221,9 @@ router.get('/', authenticate, async (req, res) => {
     },
     orderBy: { name: 'asc' }
   });
-  
   res.json({ data: products });
 });
 
-// POST /api/products - Crear producto
 router.post('/', 
   authenticate, 
   validate(productSchema),
@@ -346,71 +232,12 @@ router.post('/',
       data: req.body,
       include: { category: true }
     });
-    
     res.status(201).json({ data: product });
   }
 );
 ```
 
-### Frontend - Componente React
-
-```tsx
-// frontend/src/pages/POSPage.tsx
-import { useState } from 'react';
-import { useScale } from '../contexts/ScaleContext';
-import { useCart } from '../hooks/useCart';
-import { ProductSearch } from '../components/products/ProductSearch';
-import { CartTable } from '../components/CartTable';
-import { PaymentModal } from '../components/PaymentModal';
-
-export function POSPage() {
-  const { weight, isConnected } = useScale();
-  const { cart, addItem, removeItem, total } = useCart();
-  const [showPayment, setShowPayment] = useState(false);
-
-  return (
-    <div className="flex h-full">
-      {/* Panel izquierdo: Productos */}
-      <div className="flex-1 p-4">
-        <ProductSearch onSelect={addItem} />
-        
-        {/* Indicador de balanza */}
-        {isConnected && (
-          <div className="mt-4 p-3 bg-green-100 rounded-lg">
-            <span className="text-green-700">
-              ⚖️ Peso: {weight.toFixed(3)} kg
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Panel derecho: Carrito */}
-      <div className="w-96 border-l bg-gray-50 p-4">
-        <CartTable items={cart} onRemove={removeItem} />
-        
-        <div className="mt-4 text-right">
-          <p className="text-2xl font-bold">Total: ${total.toFixed(2)}</p>
-          <button 
-            onClick={() => setShowPayment(true)}
-            className="mt-2 w-full bg-green-600 text-white py-3 rounded-lg"
-          >
-            Cobrar
-          </button>
-        </div>
-      </div>
-
-      {showPayment && (
-        <PaymentModal 
-          total={total} 
-          onClose={() => setShowPayment(false)} 
-        />
-      )}
-    </div>
-  );
-}
-```
-
-### Integración con Balanza
+### Integración con balanza USB (diferenciador real)
 
 ```typescript
 // backend/src/scale/scaleManager.ts
@@ -421,7 +248,6 @@ import { EventEmitter } from 'events';
 export class ScaleManager extends EventEmitter {
   private port: SerialPort | null = null;
   private parser: ReadlineParser | null = null;
-  private currentWeight: number = 0;
 
   constructor(private config: { port: string; baudRate: number }) {
     super();
@@ -436,94 +262,50 @@ export class ScaleManager extends EventEmitter {
     this.parser = this.port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
     this.parser.on('data', (data: string) => {
-      // Protocolo de balanza: extraer peso del string
       const weight = this.parseWeight(data);
       if (weight !== null) {
-        this.currentWeight = weight;
         this.emit('weight', weight);
       }
     });
-
-    this.emit('connected');
   }
 
   private parseWeight(data: string): number | null {
-    // Ejemplo: "ST,GS,   0.123,kg" → 0.123
     const match = data.match(/(\d+\.?\d*)/);
     return match ? parseFloat(match[1]) : null;
   }
 
   async tare(): Promise<void> {
-    // Enviar comando de tare a la balanza
     this.port?.write('T\r\n');
   }
-
-  disconnect(): void {
-    this.port?.close();
-    this.emit('disconnected');
-  }
 }
 ```
 
-### Context de Autenticación
+> Para ver los demás ejemplos (AuthContext, componente POS, etc.), revisa el código fuente directamente en `backend/src/modules/` y `frontend/src/pages/`.
 
-```typescript
-// frontend/src/contexts/AuthContext.tsx
-import { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../api/client';
+---
 
-interface User {
-  id: number;
-  username: string;
-  role: 'ADMIN' | 'SUPERVISOR' | 'VENDEDOR';
-}
+## Testing
 
-interface AuthContextType {
-  user: User | null;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
-  hasPermission: (permission: string) => boolean;
-}
+> **Este proyecto aún no tiene tests automatizados.** La cobertura de tests es una mejora planificada.
 
-const AuthContext = createContext<AuthContextType | null>(null);
+### Plan de testing
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+| Módulo | Tipo de test | Prioridad |
+|--------|-------------|-----------|
+| Ventas (POS) | Unit + Integration | Alta |
+| Inventario / Lotes | Unit + Integration | Alta |
+| Balanza (ScaleManager) | Unit (mock serial) | Media |
+| Caja / Arqueo | Integration | Media |
+| Auth / Roles | Unit + Integration | Alta |
+| Frontend (componentes) | E2E con Playwright | Baja |
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // Verificar token y obtener usuario
-      fetchUser();
-    }
-  }, []);
-
-  const login = async (username: string, password: string) => {
-    const { data } = await api.post('/auth/login', { username, password });
-    localStorage.setItem('token', data.token);
-    api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-    setUser(data.user);
-  };
-
-  const hasPermission = (permission: string): boolean => {
-    if (!user) return false;
-    const permissions = {
-      ADMIN: ['*'],
-      SUPERVISOR: ['products:read', 'products:write', 'sales:read', 'inventory:write'],
-      VENDEDOR: ['pos:use', 'sales:read'],
-    };
-    return permissions[user.role]?.includes(permission) || 
-           permissions[user.role]?.includes('*');
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, login, logout: () => {}, hasPermission }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+```bash
+# Cuando se implementen:
+npm test                    # Ejecutar todos los tests
+npm run test:coverage       # Cobertura de código
 ```
+
+Si quieres contribuir con tests, los frameworks recomendados son **Vitest** (unit/integration) y **Playwright** (E2E), alineados con el stack existente.
 
 ---
 
@@ -555,52 +337,17 @@ BACKUP_CRON="0 2 * * *"
 HTTPS=false
 ```
 
-### Configuración de la Balanza
-
-| Parámetro | Default | Descripción |
-|-----------|---------|-------------|
-| `SCALE_PORT` | COM3 | Puerto COM de la balanza |
-| `SCALE_BAUD_RATE` | 9600 | Velocidad de transmisión |
-| `SCALE_ENABLED` | true | Habilitar/deshabilitar balanza |
-
----
-
-## Backups
-
-### Configuración
-
-```env
-BACKUP_ENABLED=true
-BACKUP_DIR=./backups
-BACKUP_RETENTION=14
-BACKUP_CRON="0 2 * * *"
-```
-
-### Comandos
+### Backups
 
 ```bash
-# Backup manual
-npm run backup:run
-
-# Listar backups
-npm run backup:list
-
-# Restaurar backup
-npm run backup:restore archivo.dump
-
-# Restaurar con limpieza previa
-npm run backup:restore archivo.dump --clean
+npm run backup:run          # Backup manual
+npm run backup:list         # Listar backups
+npm run backup:restore <archivo>  # Restaurar
 ```
-
-### Desde la UI
-
-Los usuarios ADMIN pueden gestionar backups desde **Menú → Backups**.
 
 ---
 
 ## Desarrollo
-
-### Modo Desarrollo
 
 ```bash
 # Instalar dependencias
@@ -613,8 +360,6 @@ npm run dev
 # Frontend: http://localhost:5174
 ```
 
-### Comandos Útiles
-
 | Comando | Descripción |
 |---------|-------------|
 | `npm run dev` | Desarrollo con hot reload |
@@ -622,39 +367,18 @@ npm run dev
 | `npm start` | Iniciar servidor producción |
 | `npm run db:studio` | Abrir Prisma Studio |
 | `npm run db:seed` | Crear datos iniciales |
-| `npm run db:migrate:deploy` | Aplicar migraciones |
-| `npm run backup:run` | Backup manual |
-
-### Base de Datos
-
-```bash
-# Crear migración
-npx prisma migrate dev --name nombre-migracion
-
-# Aplicar migraciones
-npx prisma migrate deploy
-
-# Regenerar cliente Prisma
-npx prisma generate
-
-# Abrir Prisma Studio
-npx prisma studio
-```
 
 ---
 
-## Futuras Mejoras
+## Futuras mejoras
 
-- [ ] **CRM Completo**: Gestión avanzada de clientes con historial de compras
-- [ ] **Multi-sucursal**: Soporte para múltiples tiendas
-- [ ] **App Móvil Nativa**: React Native para iOS/Android
-- [ ] **Pasarelas de Pago**: Integración con Stripe, MercadoPago
-- [ ] **Analytics Avanzado**: Dashboard con IA predictiva
-- [ ] **API Pública**: Documentación OpenAPI/Swagger
-- [ ] **Modo Offline**: Funcionamiento sin conexión
-- [ ] **Etiquetas de Precio**: Impresión directa
-- [ ] **Recetas**: Gestión de recetas con ingredientes
-- [ ] **Fidelización**: Programa de puntos y recompensas
+- [ ] **Tests automatizados** — Vitest + Playwright
+- [ ] **Multi-sucursal** — Soporte para múltiples tiendas
+- [ ] **App móvil nativa** — React Native para iOS/Android
+- [ ] **Pasarelas de pago** — Integración con Stripe, MercadoPago
+- [ ] **Modo offline** — Funcionamiento sin conexión
+- [ ] **API pública** — Documentación OpenAPI/Swagger
+- [ ] **Fidelización** — Programa de puntos y recompensas
 
 ---
 
@@ -666,39 +390,27 @@ Este proyecto está bajo la licencia MIT. Ver [LICENSE](LICENSE) para más detal
 
 # English
 
-## 📋 Table of Contents
+## Why does FAMEAT POS exist?
 
-1. [Description](#description-1)
-2. [Features](#features-1)
-3. [Tech Stack](#tech-stack-1)
-4. [Installation](#installation-1)
-5. [Project Structure](#project-structure-1)
-6. [Functionalities](#functionalities-1)
-7. [Code Examples](#code-examples-1)
-8. [Configuration](#configuration-1)
-9. [Backups](#backups-1)
-10. [Development](#development-1)
-11. [Future Improvements](#future-improvements-1)
-12. [License](#license-1)
+FAMEAT POS was built from a real need: butcher shops and convenience stores in Latin America need a POS system that understands **products are sold by weight**, not by unit. Most existing systems are generic (cash registers, Shopify POS, etc.) and don't solve direct USB scale integration, batch tracking with expiration dates, or customer credit with FIFO tracking. This system is designed from the ground up for that specific workflow.
 
 ---
 
-## Description
+## Key Features
 
-**FAMEAT POS** is a complete point of sale system designed specifically for butcher shops, restaurants, and businesses handling products by weight. It integrates a digital scale, inventory management, sales, cash register, customer credit, suppliers, and detailed reports.
+| | |
+|---|---|
+| ⚖️ **USB Scale Integration** | Direct connection with CH340 scales — real-time weight with zero extra clicks |
+| 📦 **Batch Inventory** | Stock control with expiration dates and movements (entries, exits, losses) |
+| 👥 **Customer Credit** | Credit limits, partial payments with FIFO tracking, full history |
+| 💰 **Daily Cash Register** | Opening, movements, reconciliation and operational expenses |
+| 📱 **Installable PWA** | Works as an app on Android, iPhone and PC — no app store needed |
+| 🔒 **Granular Roles** | ADMIN, SUPERVISOR, VENDOR with per-module permissions |
+| 📊 **Reports + Excel** | Sales, inventory, financials — exportable to spreadsheets |
+| 🖨️ **PDF Tickets** | Generated with PDFKit, customizable with business logo |
 
-The system works as an installable **PWA (Progressive Web App)** on mobile and desktop devices, allowing access from any device on the local network.
-
-### Who is it for?
-
-- **Butcher shops**: Product control by weight with digital scale
-- **Restaurants**: Real-time inventory and sales management
-- **Convenience stores**: Stock, customer, and supplier control
-- **Food businesses**: Expiration and batch tracking
-
----
-
-## Features
+<details>
+<summary><strong>See all features (15)</strong></summary>
 
 | Feature | Description |
 |---------|-------------|
@@ -718,18 +430,13 @@ The system works as an installable **PWA (Progressive Web App)** on mobile and d
 | 📈 **Reports** | Sales, inventory, financial, and Excel |
 | 🔍 **Barcode Scanner** | Integrated scanner with camera or USB device |
 
+</details>
+
 ---
 
 ## Tech Stack
 
 ### Architecture
-
-| Pattern | Description |
-|---------|-------------|
-| **Stack** | **PERN** (PostgreSQL, Express, React, Node.js) |
-| **Backend Pattern** | **Modular Architecture** (controller + routes + schema per module) |
-| **Frontend Pattern** | **Component-Based** (React Context + Custom Hooks + Pages) |
-| **Monorepo** | npm workspaces (backend + frontend) |
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -747,45 +454,29 @@ The system works as an installable **PWA (Progressive Web App)** on mobile and d
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Backend
-
-| Component | Technology | Version |
-|-----------|------------|---------|
+| Layer | Technology | Version |
+|-------|------------|---------|
 | Runtime | Node.js | 20+ |
 | Language | TypeScript | 5.8 |
-| Framework | Express | 4.21 |
+| Backend Framework | Express | 4.21 |
 | ORM | Prisma | 6.5 |
 | Database | PostgreSQL | 14+ |
-| Auth | JWT (jsonwebtoken) | 9.0 |
+| Auth | JWT | 9.0 |
 | Real-time | Socket.IO | 4.8 |
-| PDF | PDFKit | 0.16 |
-| Scale | Serialport | 12.0 |
-| Validation | Zod | 3.24 |
-| Excel | ExcelJS | 4.4 |
-
-### Frontend
-
-| Component | Technology | Version |
-|-----------|------------|---------|
-| Framework | React | 19.2 |
+| Frontend Framework | React | 19.2 |
 | Bundler | Vite | 7.3 |
 | CSS | Tailwind CSS | 4.2 |
-| Routes | React Router DOM | 7.13 |
-| HTTP Client | Axios | 1.13 |
-| Charts | Recharts / ApexCharts | 3.7 / 5.13 |
-| Icons | Phosphor Icons | 2.1 |
-| Notifications | React Hot Toast | 2.6 |
-| Scanner | html5-qrcode / @zxing | 2.3 / 0.22 |
+| Monorepo | npm workspaces | — |
 
-### Infrastructure
+---
 
-| Component | Technology |
-|-----------|------------|
-| Monorepo | npm workspaces |
-| Versioning | standard-version |
-| PWA | Service Worker + Manifest |
-| HTTPS | mkcert (local certificates) |
-| Drivers | CH340 USB-Serial |
+## Architecture Decisions
+
+**Why PostgreSQL + Prisma instead of MongoDB?** Relationships between sales → inventory → customers → cash register require real referential integrity. A sale affects stock, customer balance, and cash register state in a single transaction. MongoDB requires consistency logic in the application; PostgreSQL guarantees it at the database level.
+
+**Why monorepo with npm workspaces?** Frontend and backend share types (API interfaces, role enums) and deploy together. A monorepo simplifies local development (`npm run dev` starts both) and avoids duplicating TypeScript/ESLint configuration.
+
+**Why Express instead of Fastify/NestJS?** For this volume (a single business, not a multi-tenant SaaS), Express is sufficient and has the widest ecosystem. NestJS adds unnecessary complexity for an app that won't scale to thousands of concurrent users.
 
 ---
 
@@ -816,12 +507,11 @@ npm start
 ### Access
 
 - **URL**: http://localhost:3001
-- **Username**: `admin`
-- **Password**: `admin123`
+- **Credentials**: Access credentials are generated automatically during seed (`npm run db:seed`). See [INSTALL.md](INSTALL.md) for default users and how to customize them.
 
 ### Detailed Installation
 
-For complete instructions, see [INSTALL.md](INSTALL.md)
+For complete instructions (HTTPS, PWA, LAN access, backups), see [INSTALL.md](INSTALL.md)
 
 ---
 
@@ -842,114 +532,32 @@ fameat/
 │   │   │   ├── cash/           # Cash register
 │   │   │   ├── customers/      # Customers
 │   │   │   ├── suppliers/      # Suppliers
-│   │   │   ├── categories/     # Categories
-│   │   │   ├── expenses/       # Expenses
-│   │   │   ├── reports/        # Reports
-│   │   │   ├── notifications/  # Notifications
 │   │   │   └── ...             # Other modules
 │   │   ├── jobs/               # Scheduled tasks (cron)
-│   │   ├── cli/                # Command line tools
-│   │   ├── pdf/                # PDF generation
 │   │   ├── scale/              # Scale integration
+│   │   ├── pdf/                # PDF generation
 │   │   └── realtime/           # Socket.IO
-│   ├── uploads/                # Images and files
-│   └── .env                    # Environment variables
+│   └── uploads/                # Images and files
 │
 ├── frontend/                   # React + Vite + Tailwind
 │   ├── src/
 │   │   ├── pages/              # 15 main pages
 │   │   ├── components/         # Reusable components
-│   │   │   ├── ui/             # Buttons, inputs, cards, etc.
-│   │   │   ├── layout/         # Header, Sidebar, Footer
-│   │   │   └── products/       # Specific components
 │   │   ├── contexts/           # React Context (Auth, Theme, etc.)
 │   │   ├── hooks/              # Custom hooks
-│   │   ├── api/                # API clients
-│   │   ├── utils/              # Utilities
-│   │   └── pwa/                # PWA features
-│   ├── public/                 # Static assets
-│   └── dist/                   # Production build
+│   │   └── api/                # API clients
+│   └── public/                 # Static assets + PWA
 │
 ├── scripts/                    # Utility scripts
 ├── drivers/                    # CH340 drivers (scale)
-├── POS.bat                     # Windows launcher
-├── setup.ps1                   # Windows installer
-└── setup.sh                    # Linux/Mac installer
+└── POS.bat                     # Windows launcher
 ```
-
----
-
-## Functionalities
-
-### Point of Sale (POS)
-
-The main module allows quick and intuitive sales:
-
-- **Product search**: By name, barcode, or category
-- **Integrated scale**: Real-time weight from USB scale
-- **Shopping cart**: Add, modify quantities, remove items
-- **Multiple payment methods**: Cash, card, transfer
-- **Discounts**: Automatic by quantity or manual
-- **Customer credit**: Credit sales with tracking
-
-```typescript
-// Example: Scale connection
-const scale = new ScaleManager({
-  port: process.env.SCALE_PORT || 'COM3',
-  baudRate: parseInt(process.env.SCALE_BAUD_RATE || '9600')
-});
-
-scale.on('weight', (weight) => {
-  // Update weight in UI in real-time
-  io.emit('scale:weight', weight);
-});
-```
-
-### Inventory Management
-
-Complete stock control:
-
-- **Movements**: Entries, exits, adjustments, losses, returns
-- **Batches**: Batch tracking with expiration dates
-- **Alerts**: Low stock and expiring product notifications
-- **History**: Complete record of each movement
-
-### Customer System
-
-Customer management with credit system:
-
-- **Credit**: Credit limit per customer
-- **Partial payments**: Installments with FIFO tracking
-- **Discounts**: Percentage discount per customer
-- **History**: All sales and payments for each customer
-
-### Suppliers and Purchase Orders
-
-- **Supplier catalog**: Contact information and products
-- **Purchase orders**: DRAFT → SENT → RECEIVED workflow
-- **Receiving**: Automatically generates inventory movement
-- **Attachments**: Supplier invoices (scanned)
-
-### Cash and Finance
-
-- **Opening/Closing**: Daily cash control
-- **Movements**: Income and expenses with reason
-- **Reconciliation**: Expected vs actual comparison
-- **Expenses**: Categorized operational expense tracking
-
-### Reports
-
-- **Sales**: By period, category, payment method
-- **Inventory**: Current stock, valuation, rotation
-- **Financial**: Income, expenses, net profit
-- **Excel**: Export to spreadsheets
-- **PDFs**: Tickets and detailed reports
 
 ---
 
 ## Code Examples
 
-### Backend - API Route with Authentication
+### API route with auth and validation
 
 ```typescript
 // backend/src/modules/products/products.routes.ts
@@ -960,7 +568,6 @@ import { productSchema } from './products.schema';
 
 const router = Router();
 
-// GET /api/products - List active products
 router.get('/', authenticate, async (req, res) => {
   const products = await prisma.product.findMany({
     where: { active: true },
@@ -970,11 +577,9 @@ router.get('/', authenticate, async (req, res) => {
     },
     orderBy: { name: 'asc' }
   });
-  
   res.json({ data: products });
 });
 
-// POST /api/products - Create product
 router.post('/', 
   authenticate, 
   validate(productSchema),
@@ -983,71 +588,12 @@ router.post('/',
       data: req.body,
       include: { category: true }
     });
-    
     res.status(201).json({ data: product });
   }
 );
 ```
 
-### Frontend - React Component
-
-```tsx
-// frontend/src/pages/POSPage.tsx
-import { useState } from 'react';
-import { useScale } from '../contexts/ScaleContext';
-import { useCart } from '../hooks/useCart';
-import { ProductSearch } from '../components/products/ProductSearch';
-import { CartTable } from '../components/CartTable';
-import { PaymentModal } from '../components/PaymentModal';
-
-export function POSPage() {
-  const { weight, isConnected } = useScale();
-  const { cart, addItem, removeItem, total } = useCart();
-  const [showPayment, setShowPayment] = useState(false);
-
-  return (
-    <div className="flex h-full">
-      {/* Left panel: Products */}
-      <div className="flex-1 p-4">
-        <ProductSearch onSelect={addItem} />
-        
-        {/* Scale indicator */}
-        {isConnected && (
-          <div className="mt-4 p-3 bg-green-100 rounded-lg">
-            <span className="text-green-700">
-              ⚖️ Weight: {weight.toFixed(3)} kg
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Right panel: Cart */}
-      <div className="w-96 border-l bg-gray-50 p-4">
-        <CartTable items={cart} onRemove={removeItem} />
-        
-        <div className="mt-4 text-right">
-          <p className="text-2xl font-bold">Total: ${total.toFixed(2)}</p>
-          <button 
-            onClick={() => setShowPayment(true)}
-            className="mt-2 w-full bg-green-600 text-white py-3 rounded-lg"
-          >
-            Checkout
-          </button>
-        </div>
-      </div>
-
-      {showPayment && (
-        <PaymentModal 
-          total={total} 
-          onClose={() => setShowPayment(false)} 
-        />
-      )}
-    </div>
-  );
-}
-```
-
-### Scale Integration
+### USB scale integration (the real differentiator)
 
 ```typescript
 // backend/src/scale/scaleManager.ts
@@ -1058,7 +604,6 @@ import { EventEmitter } from 'events';
 export class ScaleManager extends EventEmitter {
   private port: SerialPort | null = null;
   private parser: ReadlineParser | null = null;
-  private currentWeight: number = 0;
 
   constructor(private config: { port: string; baudRate: number }) {
     super();
@@ -1073,94 +618,50 @@ export class ScaleManager extends EventEmitter {
     this.parser = this.port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
     this.parser.on('data', (data: string) => {
-      // Scale protocol: extract weight from string
       const weight = this.parseWeight(data);
       if (weight !== null) {
-        this.currentWeight = weight;
         this.emit('weight', weight);
       }
     });
-
-    this.emit('connected');
   }
 
   private parseWeight(data: string): number | null {
-    // Example: "ST,GS,   0.123,kg" → 0.123
     const match = data.match(/(\d+\.?\d*)/);
     return match ? parseFloat(match[1]) : null;
   }
 
   async tare(): Promise<void> {
-    // Send tare command to scale
     this.port?.write('T\r\n');
   }
-
-  disconnect(): void {
-    this.port?.close();
-    this.emit('disconnected');
-  }
 }
 ```
 
-### Authentication Context
+> For more examples (AuthContext, POS component, etc.), check the source code directly in `backend/src/modules/` and `frontend/src/pages/`.
 
-```typescript
-// frontend/src/contexts/AuthContext.tsx
-import { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../api/client';
+---
 
-interface User {
-  id: number;
-  username: string;
-  role: 'ADMIN' | 'SUPERVISOR' | 'VENDEDOR';
-}
+## Testing
 
-interface AuthContextType {
-  user: User | null;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
-  hasPermission: (permission: string) => boolean;
-}
+> **This project does not have automated tests yet.** Test coverage is a planned improvement.
 
-const AuthContext = createContext<AuthContextType | null>(null);
+### Testing plan
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+| Module | Test type | Priority |
+|--------|-----------|----------|
+| Sales (POS) | Unit + Integration | High |
+| Inventory / Batches | Unit + Integration | High |
+| Scale (ScaleManager) | Unit (mock serial) | Medium |
+| Cash Register | Integration | Medium |
+| Auth / Roles | Unit + Integration | High |
+| Frontend (components) | E2E with Playwright | Low |
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // Verify token and get user
-      fetchUser();
-    }
-  }, []);
-
-  const login = async (username: string, password: string) => {
-    const { data } = await api.post('/auth/login', { username, password });
-    localStorage.setItem('token', data.token);
-    api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-    setUser(data.user);
-  };
-
-  const hasPermission = (permission: string): boolean => {
-    if (!user) return false;
-    const permissions = {
-      ADMIN: ['*'],
-      SUPERVISOR: ['products:read', 'products:write', 'sales:read', 'inventory:write'],
-      VENDEDOR: ['pos:use', 'sales:read'],
-    };
-    return permissions[user.role]?.includes(permission) || 
-           permissions[user.role]?.includes('*');
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, login, logout: () => {}, hasPermission }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+```bash
+# When implemented:
+npm test                    # Run all tests
+npm run test:coverage       # Code coverage
 ```
+
+Recommended frameworks: **Vitest** (unit/integration) and **Playwright** (E2E), aligned with the existing stack.
 
 ---
 
@@ -1192,52 +693,17 @@ BACKUP_CRON="0 2 * * *"
 HTTPS=false
 ```
 
-### Scale Configuration
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `SCALE_PORT` | COM3 | Scale COM port |
-| `SCALE_BAUD_RATE` | 9600 | Transmission speed |
-| `SCALE_ENABLED` | true | Enable/disable scale |
-
----
-
-## Backups
-
-### Configuration
-
-```env
-BACKUP_ENABLED=true
-BACKUP_DIR=./backups
-BACKUP_RETENTION=14
-BACKUP_CRON="0 2 * * *"
-```
-
-### Commands
+### Backups
 
 ```bash
-# Manual backup
-npm run backup:run
-
-# List backups
-npm run backup:list
-
-# Restore backup
-npm run backup:restore file.dump
-
-# Restore with cleanup
-npm run backup:restore file.dump --clean
+npm run backup:run          # Manual backup
+npm run backup:list         # List backups
+npm run backup:restore <file>  # Restore
 ```
-
-### From the UI
-
-ADMIN users can manage backups from **Menu → Backups**.
 
 ---
 
 ## Development
-
-### Development Mode
 
 ```bash
 # Install dependencies
@@ -1250,8 +716,6 @@ npm run dev
 # Frontend: http://localhost:5174
 ```
 
-### Useful Commands
-
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Development with hot reload |
@@ -1259,39 +723,18 @@ npm run dev
 | `npm start` | Start production server |
 | `npm run db:studio` | Open Prisma Studio |
 | `npm run db:seed` | Create initial data |
-| `npm run db:migrate:deploy` | Apply migrations |
-| `npm run backup:run` | Manual backup |
-
-### Database
-
-```bash
-# Create migration
-npx prisma migrate dev --name migration-name
-
-# Apply migrations
-npx prisma migrate deploy
-
-# Regenerate Prisma client
-npx prisma generate
-
-# Open Prisma Studio
-npx prisma studio
-```
 
 ---
 
 ## Future Improvements
 
-- [ ] **Complete CRM**: Advanced customer management with purchase history
-- [ ] **Multi-store**: Support for multiple locations
-- [ ] **Native Mobile App**: React Native for iOS/Android
-- [ ] **Payment Gateways**: Stripe, MercadoPago integration
-- [ ] **Advanced Analytics**: AI-powered predictive dashboard
-- [ ] **Public API**: OpenAPI/Swagger documentation
-- [ ] **Offline Mode**: Functionality without connection
-- [ ] **Price Labels**: Direct printing
-- [ ] **Recipes**: Recipe management with ingredients
-- [ ] **Loyalty Program**: Points and rewards system
+- [ ] **Automated tests** — Vitest + Playwright
+- [ ] **Multi-store** — Support for multiple locations
+- [ ] **Native mobile app** — React Native for iOS/Android
+- [ ] **Payment gateways** — Stripe, MercadoPago integration
+- [ ] **Offline mode** — Functionality without connection
+- [ ] **Public API** — OpenAPI/Swagger documentation
+- [ ] **Loyalty program** — Points and rewards system
 
 ---
 
