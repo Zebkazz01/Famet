@@ -325,7 +325,7 @@ npm test                    # Ejecutar todos los tests
 npm run test:watch          # Modo watch (desarrollo)
 ```
 
-### Cobertura actual (136 tests)
+### Cobertura actual (144 tests)
 
 | Archivo | Tests | Qué valida |
 |---------|-------|------------|
@@ -340,6 +340,7 @@ npm run test:watch          # Modo watch (desarrollo)
 | `modules/customers/customers.schema.ts` | 12 | Clientes, pagos parciales, límites de crédito |
 | `modules/auth/auth.controller.test.ts` | 10 | JWT token generation + bcrypt password hashing |
 | `modules/products/products.test.ts` | 13 | Validación de productos (nombre, precio, tipo de venta) |
+| `modules/sales/sale.integration.test.ts` | 8 | **Integración**: login → crear venta → débito de inventario → crédito → stock insuficiente → roles |
 
 ### Próximos tests a implementar
 
@@ -417,10 +418,11 @@ npm run dev
 
 ## Futuras mejoras
 
-- [x] **Tests automatizados** — Vitest (136 tests unitarios)
+- [x] **Tests automatizados** — Vitest (144 tests: 136 unit + 8 integración)
 - [x] **API docs** — Swagger UI en `/api/docs`
 - [x] **Security headers** — Helmet + rate limiting
-- [ ] **E2E tests** — Playwright para flujo completo de venta
+- [x] **Test de integración** — Flujo completo de venta (login → venta → inventario → crédito)
+- [ ] **E2E tests** — Playwright para flujo completo de venta en navegador
 - [ ] **Feature flags** — Para gradual rollout de funcionalidades sin redeploy
 - [ ] **Migraciones zero-downtime** — Estrategia: `prisma migrate deploy` + blue-green deploy
 - [ ] **Multi-sucursal** — Soporte para múltiples tiendas
@@ -736,7 +738,7 @@ npm test                    # Run all tests
 npm run test:watch          # Watch mode (development)
 ```
 
-### Current coverage (136 tests)
+### Current coverage (144 tests)
 
 | File | Tests | What it validates |
 |------|-------|-------------------|
@@ -751,6 +753,7 @@ npm run test:watch          # Watch mode (development)
 | `modules/customers/customers.schema.ts` | 12 | Customers, partial payments, credit limits |
 | `modules/auth/auth.controller.test.ts` | 10 | JWT token generation + bcrypt password hashing |
 | `modules/products/products.test.ts` | 13 | Product validation (name, price, sale type) |
+| `modules/sales/sale.integration.test.ts` | 8 | **Integration**: login → create sale → inventory deduction → credit → insufficient stock → role authorization |
 
 ### Next tests to implement
 
@@ -828,10 +831,11 @@ npm run dev
 
 ## Future Improvements
 
-- [x] **Automated tests** — Vitest (136 unit tests)
+- [x] **Automated tests** — Vitest (144 tests: 136 unit + 8 integration)
 - [x] **API docs** — Swagger UI at `/api/docs`
 - [x] **Security headers** — Helmet + rate limiting
-- [ ] **E2E tests** — Playwright for full sale flow
+- [x] **Integration test** — Full sale flow (login → sale → inventory → credit)
+- [ ] **E2E tests** — Playwright for full sale flow in browser
 - [ ] **Feature flags** — Gradual rollout without redeploy
 - [ ] **Zero-downtime migrations** — Strategy: `prisma migrate deploy` + blue-green deploy
 - [ ] **Multi-store** — Support for multiple locations
