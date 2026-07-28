@@ -134,7 +134,7 @@ export function GlobalHeader() {
           </span>
         )}
         <span className={`font-bold text-base tracking-wide ${isDark ? 'text-white' : 'text-gray-800'}`}>
-          <span style={{ color: CYAN }}>ByteGest</span>
+          <span style={{ color: CYAN }}>FAMEAT</span>
         </span>
       </div>
 
