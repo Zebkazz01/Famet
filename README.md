@@ -828,12 +828,16 @@ npm run dev
 
 ## Future Improvements
 
-- [ ] **Automated tests** — Vitest + Playwright
+- [x] **Automated tests** — Vitest (136 unit tests)
+- [x] **API docs** — Swagger UI at `/api/docs`
+- [x] **Security headers** — Helmet + rate limiting
+- [ ] **E2E tests** — Playwright for full sale flow
+- [ ] **Feature flags** — Gradual rollout without redeploy
+- [ ] **Zero-downtime migrations** — Strategy: `prisma migrate deploy` + blue-green deploy
 - [ ] **Multi-store** — Support for multiple locations
 - [ ] **Native mobile app** — React Native for iOS/Android
 - [ ] **Payment gateways** — Stripe, MercadoPago integration
 - [ ] **Offline mode** — Functionality without connection
-- [ ] **Public API** — OpenAPI/Swagger documentation
 - [ ] **Loyalty program** — Points and rewards system
 
 ---
