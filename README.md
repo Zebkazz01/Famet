@@ -21,9 +21,6 @@
 >
 > Para crear el GIF: graba tu pantalla con [LICEcap](https://www.cockos.com/licecap/) o [ScreenToGif](https://www.screentogif.com/), reducelo a 600-800px de ancho y comprímelo con [ezgif.com](https://ezgif.com/optimize) a menos de 3MB.
 
-![FAMEAT POS Demo](demo.gif)
-
-> Si aún no tienes el GIF, puedes usar la imagen estática como placeholder:
 > ![FAMEAT POS Preview](preview.png)
 
 **🔗 [Demo en vivo → famet-backend-iota.vercel.app](https://famet-backend-iota.vercel.app)**
