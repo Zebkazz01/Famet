@@ -162,7 +162,7 @@ app.use("/api/animal-parts", animalPartsRoutes);
 app.use("/api/customers", customersRoutes);
 app.use("/api/purchase-orders", purchaseOrdersRoutes);
 app.use("/api/processing", processingRoutes);
-app.get("/api/manifest.json", manifestHandler);
+app.get("/api/manifest.json", (req, res) => { Promise.resolve(manifestHandler(req, res)).catch(() => res.status(500).json({ error: "Error" })); });
 
 // Servir imágenes (logo, productos, gastos). Path absoluto independiente del cwd.
 app.use("/uploads", express.static(resolveUploadsDir()));
@@ -171,8 +171,12 @@ app.use("/uploads", express.static(resolveUploadsDir()));
 const scaleManager = new ScaleManager(env.SCALE_PORT, env.SCALE_BAUD_RATE);
 
 app.get("/api/scale/ports", authenticate, authorize("ADMIN"), async (_req, res) => {
-  const ports = await ScaleManager.listPorts();
-  res.json(ports);
+  try {
+    const ports = await ScaleManager.listPorts();
+    res.json(ports);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/scale/connect", authenticate, authorize("ADMIN"), async (req, res) => {
@@ -192,8 +196,12 @@ app.post("/api/scale/connect", authenticate, authorize("ADMIN"), async (req, res
 });
 
 app.post("/api/scale/disconnect", authenticate, authorize("ADMIN"), async (_req, res) => {
-  await scaleManager.disconnect();
-  res.json({ message: "Desconectado", connected: false });
+  try {
+    await scaleManager.disconnect();
+    res.json({ message: "Desconectado", connected: false });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**
@@ -310,7 +318,11 @@ app.post("/api/backup/run", authenticate, authorize("ADMIN"), async (_req, res) 
 });
 
 app.get("/api/backup/list", authenticate, authorize("ADMIN"), (_req, res) => {
-  res.json(listBackups());
+  try {
+    res.json(listBackups());
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 /**
