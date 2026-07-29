@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import { authenticate, authorize } from "../../middleware/auth";
+import { asyncHandler } from "../../middleware/asyncHandler";
 import { uploadsDir } from "../../utils/paths";
 import {
   listExpenses, getExpense, createExpense, updateExpense, deleteExpense, summary,
@@ -36,11 +37,11 @@ const upload = multer({
   },
 });
 
-router.get("/summary", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), summary);
-router.get("/", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), listExpenses);
-router.get("/:id", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), getExpense);
-router.post("/", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), upload.single("evidence"), createExpense);
-router.put("/:id", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), upload.single("evidence"), updateExpense);
-router.delete("/:id", authenticate, authorize("ADMIN"), deleteExpense);
+router.get("/summary", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), asyncHandler(summary));
+router.get("/", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), asyncHandler(listExpenses));
+router.get("/:id", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), asyncHandler(getExpense));
+router.post("/", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), upload.single("evidence"), asyncHandler(createExpense));
+router.put("/:id", authenticate, authorize("ADMIN", "SUPERVISOR", "VENDEDOR"), upload.single("evidence"), asyncHandler(updateExpense));
+router.delete("/:id", authenticate, authorize("ADMIN"), asyncHandler(deleteExpense));
 
 export default router;

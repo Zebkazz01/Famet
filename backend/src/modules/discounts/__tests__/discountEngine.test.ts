@@ -5,7 +5,6 @@ import { DiscountType, type ProductDiscountRule } from '@prisma/client';
 function makeRule(overrides: Partial<ProductDiscountRule> & { productId: number }): ProductDiscountRule {
   return {
     id: 1,
-    productId: overrides.productId,
     type: DiscountType.PERCENTAGE,
     config: {},
     priority: 1,
