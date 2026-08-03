@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, formatDateTime, formatQty } from '../utils/formatters';
@@ -79,6 +79,7 @@ interface Summary {
 }
 
 export function SalesPage() {
+  const navigate = useNavigate();
   const { user, hasRole } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [detail, setDetail] = useState<SaleDetail | null>(null);
@@ -298,6 +299,10 @@ export function SalesPage() {
         description="Consulta todas las ventas realizadas con filtros por fecha, método de pago y usuario."
         actions={
           <>
+            <button onClick={() => navigate('/')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-medium">
+              <Receipt size={14} weight="duotone" /> Nueva Venta
+            </button>
             <FilterDropdown
               activeCount={activeCount}
               onClear={() => { setFilter('range', {}); setFilter('paymentMethod', ''); setFilter('corrected', ''); setFilter('sort', 'recent'); setFilter('animalType', ''); }}
