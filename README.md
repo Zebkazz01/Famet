@@ -20,7 +20,7 @@
 
 ![FAMEAT POS Preview](preview.png)
 
-**🔗 [Demo en vivo → famet-backend-iota.vercel.app](https://famet-backend-iota.vercel.app)**
+**🔗 [Demo en vivo → famet.vercel.app](https://famet.vercel.app)**
 
 </div>
 
@@ -390,6 +390,29 @@ npm run backup:run          # Backup manual
 npm run backup:list         # Listar backups
 npm run backup:restore <archivo>  # Restaurar
 ```
+
+### Despliegue en Vercel
+
+El proyecto está desplegado en **https://famet.vercel.app** (frontend estático + API serverless Express).
+
+Configura estas variables en **Vercel → Project → Settings → Environment Variables**:
+
+```env
+DATABASE_URL=postgresql://...@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+DIRECT_URL=postgresql://...@aws-0-<region>.pooler.supabase.com:5432/postgres
+JWT_SECRET=tu-secreto-seguro-aqui
+```
+
+> **Nota para Supabase**: `DATABASE_URL` debe apuntar al pooler (puerto **6543**) con `?pgbouncer=true&connection_limit=1` para evitar errores de `prepared statement` con Prisma. `DIRECT_URL` usa el puerto **5432** para migraciones.
+
+Antes del primer deploy ejecuta:
+
+```bash
+npm run db:migrate:deploy   # Aplica migraciones en Supabase
+npm run db:seed             # Crea usuarios admin/admin123, categorías y productos de ejemplo
+```
+
+El build en Vercel (`npm run build:vercel`) genera el cliente Prisma, compila el backend y el frontend automáticamente. En serverless, uploads/backups se escriben en `/tmp` (efímero) y la balanza serial/WebSocket no están disponibles — esas funciones funcionan en el servidor local.
 
 ---
 
@@ -803,6 +826,29 @@ npm run backup:run          # Manual backup
 npm run backup:list         # List backups
 npm run backup:restore <file>  # Restore
 ```
+
+### Vercel Deployment
+
+Live at **https://famet.vercel.app** (static frontend + serverless Express API).
+
+Set these variables in **Vercel → Project → Settings → Environment Variables**:
+
+```env
+DATABASE_URL=postgresql://...@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+DIRECT_URL=postgresql://...@aws-0-<region>.pooler.supabase.com:5432/postgres
+JWT_SECRET=your-secret-key-here
+```
+
+> **Supabase note**: `DATABASE_URL` must point to the pooler (port **6543**) with `?pgbouncer=true&connection_limit=1` to avoid Prisma `prepared statement` errors. `DIRECT_URL` uses port **5432** for migrations.
+
+Before the first deploy run:
+
+```bash
+npm run db:migrate:deploy   # Apply migrations to Supabase
+npm run db:seed             # Creates admin/admin123, categories and sample products
+```
+
+The Vercel build (`npm run build:vercel`) generates the Prisma client and compiles backend + frontend automatically. On serverless, uploads/backups go to `/tmp` (ephemeral) and the serial scale/WebSocket are unavailable — those work on the local server.
 
 ---
 
