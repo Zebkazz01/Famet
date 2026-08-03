@@ -32,6 +32,12 @@ html, body {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+/* Fade-in para overlay de carga */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 .skeleton-pulse {
   background: linear-gradient(
     90deg,

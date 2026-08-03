@@ -1,11 +1,12 @@
 import { Request, Response } from "express";
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "../../config/database";
+import { getBusinessDayDate, getBusinessDayStart, getBusinessDayEnd, groupByBusinessDay } from "../../utils/businessDay";
 
 export async function getKPIs(req: Request, res: Response) {
-  const date = req.query.date ? String(req.query.date) : new Date().toISOString().split("T")[0];
-  const startOfDay = new Date(date + "T00:00:00");
-  const endOfDay = new Date(date + "T23:59:59");
+  const date = req.query.date ? String(req.query.date) : getBusinessDayDate();
+  const startOfDay = getBusinessDayStart(date);
+  const endOfDay = getBusinessDayEnd(date);
 
   // Ventas del día
   const sales = await prisma.sale.findMany({
@@ -19,8 +20,9 @@ export async function getKPIs(req: Request, res: Response) {
   // Ventas del día anterior para comparación
   const prevDate = new Date(startOfDay);
   prevDate.setDate(prevDate.getDate() - 1);
-  const prevStart = new Date(prevDate.toISOString().split("T")[0] + "T00:00:00");
-  const prevEnd = new Date(prevDate.toISOString().split("T")[0] + "T23:59:59");
+  const prevDateStr = prevDate.toISOString().split("T")[0];
+  const prevStart = getBusinessDayStart(prevDateStr);
+  const prevEnd = getBusinessDayEnd(prevDateStr);
 
   const prevSales = await prisma.sale.findMany({
     where: { createdAt: { gte: prevStart, lte: prevEnd } },
@@ -90,19 +92,19 @@ export async function getKPIs(req: Request, res: Response) {
 export async function getAnalytics(req: Request, res: Response) {
   let start: Date, end: Date, days: number;
   if (req.query.from && req.query.to) {
-    start = new Date(String(req.query.from) + "T00:00:00");
-    end   = new Date(String(req.query.to)   + "T23:59:59");
+    start = getBusinessDayStart(String(req.query.from));
+    end   = getBusinessDayEnd(String(req.query.to));
     if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
       return res.status(400).json({ error: "Rango de fechas inválido" });
     }
     days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1);
   } else {
     days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
-    end = new Date();
-    end.setHours(23, 59, 59, 999);
+    const today = getBusinessDayDate();
+    end = getBusinessDayEnd(today);
     start = new Date(end);
     start.setDate(start.getDate() - days + 1);
-    start.setHours(0, 0, 0, 0);
+    start = getBusinessDayStart(start.toISOString().slice(0, 10));
   }
 
   const [sales, expenses, products, batches] = await Promise.all([
@@ -131,16 +133,16 @@ export async function getAnalytics(req: Request, res: Response) {
   for (let i = 0; i < days; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
-    const key = d.toISOString().slice(0, 10);
+    const key = groupByBusinessDay(d);
     dayMap.set(key, { revenue: 0, count: 0, expenses: 0, profit: 0 });
   }
   for (const s of sales) {
-    const k = s.createdAt.toISOString().slice(0, 10);
+    const k = groupByBusinessDay(s.createdAt);
     const e = dayMap.get(k);
     if (e) { e.revenue += Number(s.total); e.count++; }
   }
   for (const ex of expenses) {
-    const k = ex.createdAt.toISOString().slice(0, 10);
+    const k = groupByBusinessDay(ex.createdAt);
     const e = dayMap.get(k);
     if (e) e.expenses += Number(ex.amount);
   }
@@ -164,6 +166,29 @@ export async function getAnalytics(req: Request, res: Response) {
     }
   }
   const byCategory = Array.from(catMap.values()).sort((a, b) => b.revenue - a.revenue);
+
+  // === By animal type (Res vs Cerdo) ===
+  const animalTypeMap = new Map<string, { type: string; revenue: number; qty: number; weightQtyKg: number; unitQty: number; count: number }>();
+  for (const s of sales) {
+    for (const it of s.items) {
+      const animalType = (it.product as any)?.animalType || 'OTRO';
+      const saleType = (it.product as any)?.saleType || 'UNIT';
+      const weightUnit = (it.product as any)?.weightUnit || 'kg';
+      const qty = Number(it.quantity);
+      const e = animalTypeMap.get(animalType) || { type: animalType, revenue: 0, qty: 0, weightQtyKg: 0, unitQty: 0, count: 0 };
+      e.revenue += Number(it.subtotal);
+      e.qty += qty;
+      if (saleType === 'WEIGHT') {
+        // Normalize everything to kg (1 lb = 0.453592 kg)
+        e.weightQtyKg += weightUnit === 'lb' ? qty * 0.453592 : qty;
+      } else {
+        e.unitQty += qty;
+      }
+      e.count++;
+      animalTypeMap.set(animalType, e);
+    }
+  }
+  const byAnimalType = Array.from(animalTypeMap.values()).sort((a, b) => b.revenue - a.revenue);
 
   // === Top products ===
   const prodMap = new Map<number, { id: number; name: string; revenue: number; qty: number }>();
@@ -271,6 +296,101 @@ export async function getAnalytics(req: Request, res: Response) {
   const totalExpenses = expenses.reduce((s, x) => s + Number(x.amount), 0);
   const totalCount = sales.length;
 
+  // === Inventory Summary (resumen de inventario) ===
+  const totalInventoryValue = products.reduce(
+    (sum, p) => sum + Number(p.price) * Number(p.stockQty), 0
+  );
+  const lowStockCount = products.filter(
+    (p) => Number(p.stockQty) <= Number(p.minStock) && Number(p.minStock) > 0
+  ).length;
+  const expiringCount = batches.filter(
+    (b: any) => b.expiryDate && new Date(b.expiryDate) <= sevenDays && Number(b.qty) > 0
+  ).length;
+  const topRotated = topProducts.slice(0, 5).map((p) => ({
+    name: p.name,
+    qtySold: p.qty,
+    revenue: p.revenue,
+  }));
+
+  // Movimientos recientes de inventario
+  let recentMovements: Array<{
+    id: number; type: string; productName: string; quantity: number; date: string; user: string;
+  }> = [];
+  try {
+    const movements = await (prisma as any).inventoryMovement.findMany({
+      take: 15,
+      orderBy: { createdAt: "desc" },
+      include: {
+        product: { select: { name: true } },
+        user: { select: { firstName: true, lastName: true } },
+      },
+    });
+    recentMovements = movements.map((m: any) => ({
+      id: m.id,
+      type: m.type,
+      productName: m.product?.name || "",
+      quantity: Number(m.quantity),
+      date: m.createdAt.toISOString(),
+      user: m.user ? `${m.user.firstName} ${m.user.lastName}`.trim() : "",
+    }));
+  } catch { }
+
+  const inventorySummary = {
+    totalValue: totalInventoryValue,
+    lowStockCount,
+    expiringCount,
+    topRotated,
+    recentMovements,
+  };
+
+  // === Recent Activity (actividad reciente) ===
+  const recentSales = sales.slice(0, 15).map((s) => ({
+    id: s.id,
+    type: "sale" as const,
+    description: `Venta #${s.id}`,
+    amount: Number(s.total),
+    timestamp: s.createdAt.toISOString(),
+    user: s.user ? `${s.user.firstName} ${s.user.lastName}`.trim() : "",
+  }));
+  const recentExpensesList = expenses.slice(0, 5).map((e: any) => ({
+    id: e.id,
+    type: "expense" as const,
+    description: e.description || "Gasto",
+    amount: -Number(e.amount),
+    timestamp: (e.createdAt || e.date).toISOString(),
+    user: "",
+  }));
+  const recentActivity = [...recentSales, ...recentExpensesList]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 25);
+
+  // === Period Comparison (comparativa del período) ===
+  const midMs = start.getTime() + (end.getTime() - start.getTime()) / 2;
+  const midDate = new Date(midMs);
+  let currentPeriod = { revenue: 0, salesCount: 0, profit: 0, avgTicket: 0 };
+  let previousPeriod = { revenue: 0, salesCount: 0, profit: 0, avgTicket: 0 };
+  for (const d of dailySeries) {
+    const dt = new Date(d.date).getTime();
+    const bucket = dt >= midDate.getTime() ? currentPeriod : previousPeriod;
+    bucket.revenue += d.revenue;
+    bucket.salesCount += d.count;
+    bucket.profit += d.profit;
+  }
+  currentPeriod.avgTicket = currentPeriod.salesCount > 0 ? currentPeriod.revenue / currentPeriod.salesCount : 0;
+  previousPeriod.avgTicket = previousPeriod.salesCount > 0 ? previousPeriod.revenue / previousPeriod.salesCount : 0;
+
+  const safeDiv = (a: number, b: number) => b !== 0 ? ((a - b) / Math.abs(b)) * 100 : 0;
+  const periodComparison = {
+    current: currentPeriod,
+    previous: previousPeriod,
+    deltas: {
+      revenue: safeDiv(currentPeriod.revenue, previousPeriod.revenue),
+      salesCount: safeDiv(currentPeriod.salesCount, previousPeriod.salesCount),
+      profit: safeDiv(currentPeriod.profit, previousPeriod.profit),
+      avgTicket: safeDiv(currentPeriod.avgTicket, previousPeriod.avgTicket),
+    },
+  };
+
   return res.json({
     range: { start: start.toISOString(), end: end.toISOString(), days },
     totals: {
@@ -282,6 +402,7 @@ export async function getAnalytics(req: Request, res: Response) {
     },
     dailySeries,
     byCategory,
+    byAnimalType,
     topProducts,
     byHour,
     byPaymentMethod,
@@ -291,6 +412,9 @@ export async function getAnalytics(req: Request, res: Response) {
     expiringSoon,
     forecastSeries,
     topProductsForecast,
+    inventorySummary,
+    recentActivity,
+    periodComparison,
   });
 }
 

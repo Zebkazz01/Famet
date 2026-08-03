@@ -11,4 +11,5 @@ export * from './FileInput';
 export * from './Combobox';
 export * from './DateRangePicker';
 export * from './FilterPanel';
+export * from './FilterDropdown';
 export * from './Skeleton';

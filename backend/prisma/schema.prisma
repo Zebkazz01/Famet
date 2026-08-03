@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -45,6 +46,7 @@ enum MovementType {
   EXPIRED
   PROCESSING_OUTPUT
   PROCESSING_INPUT
+  PROCESSING_REVERT
 }
 
 enum NotificationType {

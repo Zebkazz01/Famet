@@ -93,6 +93,7 @@ export async function update(req: Request, res: Response) {
 
   const existing = await prisma.processingBatch.findUnique({ where: { id } });
   if (!existing) throw new AppError(404, "Proceso no encontrado");
+  if (existing.status === "COMPLETED") throw new AppError(400, "Para editar un proceso completado, reviértalo a borrador primero");
   if (existing.status !== "DRAFT") throw new AppError(400, "Solo se puede editar un proceso en borrador");
 
   const batch = await prisma.$transaction(async (tx) => {
@@ -239,14 +240,163 @@ export async function cancel(req: Request, res: Response) {
   return res.json(updated);
 }
 
+export async function revert(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const userId = req.user!.userId;
+
+  const batch = await prisma.processingBatch.findUnique({
+    where: { id },
+    include: { outputs: true },
+  });
+  if (!batch) throw new AppError(404, "Proceso no encontrado");
+  if (batch.status !== "COMPLETED") throw new AppError(400, "Solo se puede revertir un proceso completado");
+
+  const result = await prisma.$transaction(async (tx) => {
+    for (const output of batch.outputs) {
+      const prod = await tx.product.findUnique({ where: { id: output.productId } });
+      if (!prod) continue;
+
+      const prevStock = Number(prod.stockQty);
+      const prevCost = Number(prod.cost ?? 0);
+      const weight = Number(output.weightKg);
+      const newStock = Math.max(0, +(prevStock - weight).toFixed(3));
+      const newCost = newStock > 0
+        ? +((prevCost * prevStock - Number(output.totalCost)) / newStock).toFixed(2)
+        : 0;
+
+      await tx.product.update({
+        where: { id: output.productId },
+        data: { stockQty: newStock, cost: newCost },
+      });
+
+      await tx.inventoryMovement.create({
+        data: {
+          productId: output.productId,
+          type: "PROCESSING_REVERT",
+          quantity: weight,
+          previousQty: prevStock,
+          newQty: newStock,
+          unitCost: Number(output.costPerKg),
+          totalValue: Number(output.totalCost),
+          notes: `Reversión procesamiento ${batch.code}: ${batch.animalType}`,
+          userId,
+        },
+      });
+    }
+
+    const inputProd = await tx.product.findUnique({ where: { id: batch.inputProductId } });
+    if (inputProd) {
+      const prevInputStock = Number(inputProd.stockQty);
+      const newInputStock = +(prevInputStock + Number(batch.inputWeightKg)).toFixed(3);
+      await tx.product.update({
+        where: { id: batch.inputProductId },
+        data: { stockQty: newInputStock },
+      });
+      await tx.inventoryMovement.create({
+        data: {
+          productId: batch.inputProductId,
+          type: "PROCESSING_REVERT",
+          quantity: Number(batch.inputWeightKg),
+          previousQty: prevInputStock,
+          newQty: newInputStock,
+          unitCost: Number(batch.inputWeightKg) > 0
+            ? +(Number(batch.totalCost) / Number(batch.inputWeightKg)).toFixed(2)
+            : 0,
+          totalValue: Number(batch.totalCost),
+          notes: `Reversión procesamiento ${batch.code}: insumo devuelto`,
+          userId,
+        },
+      });
+    }
+
+    return tx.processingBatch.update({
+      where: { id },
+      data: { status: "DRAFT", completedAt: null },
+      include: batchInclude,
+    });
+  });
+
+  return res.json(result);
+}
+
 export async function remove(req: Request, res: Response) {
   const id = Number(req.params.id);
-  const batch = await prisma.processingBatch.findUnique({ where: { id } });
-  if (!batch) throw new AppError(404, "Proceso no encontrado");
-  if (batch.status === "COMPLETED") throw new AppError(400, "No se puede eliminar un proceso completado. Cancele primero las operaciones de inventario asociadas.");
-  if (batch.status !== "DRAFT" && batch.status !== "CANCELLED") throw new AppError(400, "Solo se puede eliminar un proceso en borrador o cancelado");
+  const userId = req.user!.userId;
 
-  await prisma.processingBatch.delete({ where: { id } });
+  const batch = await prisma.processingBatch.findUnique({
+    where: { id },
+    include: { outputs: true },
+  });
+  if (!batch) throw new AppError(404, "Proceso no encontrado");
+  if (batch.status !== "DRAFT" && batch.status !== "CANCELLED" && batch.status !== "COMPLETED") {
+    throw new AppError(400, "No se puede eliminar este proceso");
+  }
+
+  if (batch.status === "COMPLETED") {
+    await prisma.$transaction(async (tx) => {
+      for (const output of batch.outputs) {
+        const prod = await tx.product.findUnique({ where: { id: output.productId } });
+        if (!prod) continue;
+
+        const prevStock = Number(prod.stockQty);
+        const weight = Number(output.weightKg);
+        const newStock = Math.max(0, +(prevStock - weight).toFixed(3));
+        const prevCost = Number(prod.cost ?? 0);
+        const newCost = newStock > 0
+          ? +((prevCost * prevStock - Number(output.totalCost)) / newStock).toFixed(2)
+          : 0;
+
+        await tx.product.update({
+          where: { id: output.productId },
+          data: { stockQty: newStock, cost: newCost },
+        });
+
+        await tx.inventoryMovement.create({
+          data: {
+            productId: output.productId,
+            type: "PROCESSING_REVERT",
+            quantity: weight,
+            previousQty: prevStock,
+            newQty: newStock,
+            unitCost: Number(output.costPerKg),
+            totalValue: Number(output.totalCost),
+            notes: `Eliminación procesamiento ${batch.code}: reversión de stock`,
+            userId,
+          },
+        });
+      }
+
+      const inputProd = await tx.product.findUnique({ where: { id: batch.inputProductId } });
+      if (inputProd) {
+        const prevInputStock = Number(inputProd.stockQty);
+        const newInputStock = +(prevInputStock + Number(batch.inputWeightKg)).toFixed(3);
+        await tx.product.update({
+          where: { id: batch.inputProductId },
+          data: { stockQty: newInputStock },
+        });
+        await tx.inventoryMovement.create({
+          data: {
+            productId: batch.inputProductId,
+            type: "PROCESSING_REVERT",
+            quantity: Number(batch.inputWeightKg),
+            previousQty: prevInputStock,
+            newQty: newInputStock,
+            unitCost: Number(batch.inputWeightKg) > 0
+              ? +(Number(batch.totalCost) / Number(batch.inputWeightKg)).toFixed(2)
+              : 0,
+            totalValue: Number(batch.totalCost),
+            notes: `Eliminación procesamiento ${batch.code}: insumo devuelto`,
+            userId,
+          },
+        });
+      }
+
+      await tx.processingBatch.delete({ where: { id } });
+    });
+  } else {
+    await prisma.processingBatch.delete({ where: { id } });
+  }
+
   return res.json({ message: "Proceso eliminado permanentemente" });
 }
 

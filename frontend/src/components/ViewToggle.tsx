@@ -27,8 +27,15 @@ interface ViewToggleProps<T> {
   defaultView?: 'table' | 'cards';
   onCreateNew?: () => void;
   createNewLabel?: string;
-  /** Key para persistir vista (tabla/cards) y perPage en localStorage */
   storageKey?: string;
+  /** Slot para botón de filtros (FilterDropdown) al lado del buscador */
+  filterSlot?: React.ReactNode;
+  /** Slot para botón de recarga (RefreshButton) junto al selector de registros */
+  refreshSlot?: React.ReactNode;
+  /** Total sin filtros — se muestra en la paginación cuando hay filtros activos */
+  totalCount?: number;
+  /** Indica si los datos se están cargando (muestra skeleton sobre la tabla) */
+  loading?: boolean;
 }
 
 const VIEW_PREFIX = 'fameat-view-toggle-';
@@ -38,6 +45,7 @@ export function ViewToggle<T extends Record<string, any>>({
   emptyMessage = 'Sin datos', emptyIcon, searchPlaceholder = 'Buscar...',
   searchFilter, searchInputProps, pageSize = 10, defaultView = 'table',
   onCreateNew, createNewLabel = 'Crear nuevo', storageKey,
+  filterSlot, refreshSlot, totalCount, loading = false,
 }: ViewToggleProps<T>) {
   const [view, setView] = useState<'table' | 'cards'>(() => {
     if (storageKey) {
@@ -137,6 +145,8 @@ export function ViewToggle<T extends Record<string, any>>({
 
         {/* View toggle + per page */}
         <div className="flex items-center gap-2">
+          {filterSlot}
+          {refreshSlot}
           <select
             value={perPage}
             onChange={(e) => { setPerPage(Number(e.target.value)); setPage(0); }}
@@ -168,7 +178,16 @@ export function ViewToggle<T extends Record<string, any>>({
       </div>
 
       {/* Content */}
-      {paged.length === 0 ? (
+      <div className="relative">
+        {loading && (
+          <div className="absolute inset-0 z-10 bg-white/70 dark:bg-slate-900/70 backdrop-blur-sm rounded-xl flex items-center justify-center" style={{ animation: 'fadeIn 200ms ease-out' }}>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span className="inline-block w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+              Cargando...
+            </div>
+          </div>
+        )}
+        {paged.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 px-4">
           {search ? (
             <>
@@ -269,7 +288,7 @@ export function ViewToggle<T extends Record<string, any>>({
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <span className="text-xs text-gray-400">
-            {page * perPage + 1}-{Math.min((page + 1) * perPage, filtered.length)} de {filtered.length}
+            {page * perPage + 1}-{Math.min((page + 1) * perPage, filtered.length)} de {filtered.length}{totalCount != null && totalCount !== filtered.length ? ` (de ${totalCount})` : ''}
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -305,6 +324,7 @@ export function ViewToggle<T extends Record<string, any>>({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

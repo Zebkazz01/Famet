@@ -8,7 +8,7 @@ import client from '../api/client';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Portal } from '../components/Portal';
-import { FilterPanel, Combobox } from '../components/ui';
+import { FilterDropdown, Combobox } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { useEnterSubmit } from '../hooks/useEnterSubmit';
 import { useModalEscape } from '../contexts/ModalStackContext';
@@ -162,9 +162,31 @@ export function PurchaseOrdersPage() {
         title="Órdenes de Compra"
         description="Gestiona el flujo de compras a proveedores. Crea órdenes con productos y cantidades, registra recepción parcial o total — al recibir se actualiza automáticamente el stock con costo promedio ponderado y genera movimiento de inventario tipo ENTRY."
         actions={
-          <button id="orders-new-btn" onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 text-xs md:text-sm">
-            <Plus size={16} weight="bold" /> Nueva OC
-          </button>
+          <>
+            <button id="orders-new-btn" onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 text-xs md:text-sm">
+              <Plus size={16} weight="bold" /> Nueva OC
+            </button>
+            <FilterDropdown activeCount={oActiveCount} onClear={clearOFilters} chips={[
+              ...(oFilters.status ? [{ key: 'status', label: STATUS_META[oFilters.status]?.label || oFilters.status, onRemove: () => setOFilter('status', '') }] : []),
+              ...(oFilters.supplierId ? [{ key: 'sup', label: `Prov: ${suppliers.find((s) => String(s.id) === oFilters.supplierId)?.name || oFilters.supplierId}`, onRemove: () => setOFilter('supplierId', '') }] : []),
+            ]} storageKey="purchaseOrders">
+              <Combobox label="Estado" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona estado"
+                options={[
+                  { value: '', label: 'Todos' },
+                  ...Object.entries(STATUS_META).map(([k, v]) => ({ value: k, label: v.label })),
+                ]}
+                value={oFilters.status} onChange={(v) => setOFilter('status', (v as string) || '')} />
+              <Combobox label="Proveedor" icon={<Truck size={14} weight="duotone" />} placeholder="Selecciona proveedor"
+                options={[{ value: '', label: 'Todos' }, ...suppliers.map((s) => ({ value: String(s.id), label: s.name }))]}
+                value={oFilters.supplierId} onChange={(v) => setOFilter('supplierId', (v as string) || '')} />
+              <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
+                { value: 'recent', label: 'Más reciente' },
+                { value: 'oldest', label: 'Más antiguo' },
+                { value: 'totalDesc', label: 'Total mayor a menor' },
+                { value: 'totalAsc', label: 'Total menor a mayor' },
+              ]} value={oFilters.sort || 'recent'} onChange={(v) => setOFilter('sort', (v as string) || '')} clearable={false} />
+            </FilterDropdown>
+          </>
         }
       />
 
@@ -175,34 +197,6 @@ export function PurchaseOrdersPage() {
         { label: 'Recibidas', value: list.filter(o => o.status === 'RECEIVED').length, icon: <CheckCircle size={20} weight="duotone" />, color: 'bg-green-100 text-green-600' },
         { label: 'Total gastado', value: formatCurrency(list.reduce((s, o) => s + parseFloat(o.total), 0)), icon: <CurrencyDollar size={20} weight="duotone" />, color: 'bg-purple-100 text-purple-600' },
       ]} />
-
-      {/* Filtros */}
-      <div className="mb-4">
-        <FilterPanel storageKey="purchaseOrders" toggleOnEvent="fameat:toggle-filters"
-          activeCount={oActiveCount}
-          onClear={clearOFilters}
-          chips={[
-            ...(oFilters.status ? [{ key: 'status', label: STATUS_META[oFilters.status]?.label || oFilters.status, onRemove: () => setOFilter('status', '') }] : []),
-            ...(oFilters.supplierId ? [{ key: 'sup', label: `Prov: ${suppliers.find((s) => String(s.id) === oFilters.supplierId)?.name || oFilters.supplierId}`, onRemove: () => setOFilter('supplierId', '') }] : []),
-          ]}
-        >
-          <Combobox label="Estado" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona estado"
-            options={[
-              { value: '', label: 'Todos' },
-              ...Object.entries(STATUS_META).map(([k, v]) => ({ value: k, label: v.label })),
-            ]}
-            value={oFilters.status} onChange={(v) => setOFilter('status', (v as string) || '')} />
-          <Combobox label="Proveedor" icon={<Truck size={14} weight="duotone" />} placeholder="Selecciona proveedor"
-            options={[{ value: '', label: 'Todos' }, ...suppliers.map((s) => ({ value: String(s.id), label: s.name }))]}
-            value={oFilters.supplierId} onChange={(v) => setOFilter('supplierId', (v as string) || '')} />
-          <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
-            { value: 'recent', label: 'Más reciente' },
-            { value: 'oldest', label: 'Más antiguo' },
-            { value: 'totalDesc', label: 'Total mayor a menor' },
-            { value: 'totalAsc', label: 'Total menor a mayor' },
-          ]} value={oFilters.sort || 'recent'} onChange={(v) => setOFilter('sort', (v as string) || '')} clearable={false} />
-        </FilterPanel>
-      </div>
 
       {/* Barra de búsqueda */}
       <div className="relative mb-3">
@@ -290,12 +284,13 @@ export function PurchaseOrdersPage() {
             <div className="flex-1 overflow-auto p-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1">Proveedor *</label>
-                  <select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-700 dark:border-gray-600">
-                    <option value={0}>— Seleccionar —</option>
-                    {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+                  <Combobox
+                    label="Proveedor *"
+                    placeholder="Buscar proveedor..."
+                    options={suppliers.map((s) => ({ value: String(s.id), label: s.name }))}
+                    value={form.supplierId ? String(form.supplierId) : ''}
+                    onChange={(v) => setForm({ ...form, supplierId: Number(v) || 0 })}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1">Fecha esperada</label>
@@ -325,14 +320,15 @@ export function PurchaseOrdersPage() {
                       {form.items.map((it, idx) => (
                         <tr key={idx}>
                           <td className="px-2 py-1.5">
-                            <select value={it.productId} onChange={(e) => {
-                              const p = products.find((pp) => pp.id === Number(e.target.value));
-                              updateItem(idx, { productId: Number(e.target.value), unitCost: p?.cost ? Number(p.cost) : it.unitCost });
-                            }}
-                              className="w-full px-2 py-1 border rounded text-xs dark:bg-slate-700 dark:border-gray-600">
-                              <option value={0}>—</option>
-                              {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
+                            <Combobox
+                              placeholder="Buscar producto..."
+                              options={products.map((p) => ({ value: String(p.id), label: p.name }))}
+                              value={it.productId ? String(it.productId) : ''}
+                              onChange={(v) => {
+                                const p = products.find((pp) => pp.id === Number(v));
+                                updateItem(idx, { productId: Number(v), unitCost: p?.cost ? Number(p.cost) : it.unitCost });
+                              }}
+                            />
                           </td>
                           <td className="px-2 py-1.5">
                             <input type="number" step="0.01" min="0" value={it.quantityOrdered}

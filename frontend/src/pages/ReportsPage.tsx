@@ -10,11 +10,13 @@ import { Card, Button, Badge, Tabs, TabList, Tab, TabPanel, DateRangePicker, Sel
 import type { DateRange } from '../components/ui/DateRangePicker';
 import { PageHeader } from '../components/layout/PageHeader';
 import { formatCurrency } from '../utils/formatters';
+import { getBusinessDayDate, getTodayCalendarDate } from '../utils/businessDay';
 import { useAuth } from '../contexts/AuthContext';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid, BarChart, Bar, Legend } from 'recharts';
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+function todayISO() { return getBusinessDayDate(); }
+function todayCalendarISO() { return getTodayCalendarDate(); }
 function monthStart() {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);

@@ -1,8 +1,8 @@
 /**
  * Service Worker - POS PWA
- * SPA: todas las navegaciones devuelven index.html
+ * v1.4.0: Network-First para assets, cleanup corregido
  */
-var CACHE_VERSION = 'v1.3.0';
+var CACHE_VERSION = 'v1.4.0';
 var CACHE_STATIC  = 'pos-static-' + CACHE_VERSION;
 var CACHE_IMAGES  = 'pos-images-' + CACHE_VERSION;
 var CACHE_DYNAMIC = 'pos-dynamic-' + CACHE_VERSION;
@@ -31,14 +31,13 @@ self.addEventListener('install', function(event) {
   );
 });
 
-// ACTIVATE
+// ACTIVATE — limpiar TODOS los caches viejos (no solo fameat-)
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(names) {
       return Promise.all(
         names.filter(function(n) {
-          return n.startsWith('fameat-') &&
-                 n !== CACHE_STATIC &&
+          return n !== CACHE_STATIC &&
                  n !== CACHE_IMAGES &&
                  n !== CACHE_DYNAMIC;
         }).map(function(n) { return caches.delete(n); })
@@ -97,14 +96,14 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Assets estáticos: Cache-First
+  // JS/CSS/Assets: Network-First (siempre buscar versión fresca del server)
   if (/\.(js|css|woff2?|ttf|eot)$/i.test(p) || p.startsWith('/assets/')) {
-    event.respondWith(cacheFirst(request, CACHE_STATIC));
+    event.respondWith(networkFirst(request));
     return;
   }
 
-  // Todo lo demás: Cache-First
-  event.respondWith(cacheFirst(request, CACHE_STATIC));
+  // Todo lo demás: Network-First
+  event.respondWith(networkFirst(request));
 });
 
 function networkFirst(request) {
@@ -119,7 +118,7 @@ function networkFirst(request) {
   }).catch(function() {
     return caches.match(request).then(function(cached) {
       return cached || new Response(
-        JSON.stringify({ error: 'Sin conexión' }),
+        JSON.stringify({ error: 'Sin conexion' }),
         { status: 503, headers: { 'Content-Type': 'application/json' } }
       );
     });

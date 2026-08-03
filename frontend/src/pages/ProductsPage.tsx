@@ -111,7 +111,7 @@ import { ErrorView } from '../components/ErrorBoundary';
 import { ExpiryBadge } from '../components/products/ExpiryBadge';
 import { BatchManagerModal } from '../components/products/BatchManagerModal';
 import { DiscountRulesEditor } from '../components/products/DiscountRulesEditor';
-import { FilterPanel, Combobox } from '../components/ui';
+import { FilterDropdown, RefreshButton, Combobox } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { useEnterSubmit } from '../hooks/useEnterSubmit';
 import { useScale } from '../contexts/ScaleContext';
@@ -461,13 +461,41 @@ export function ProductsPage() {
         title="Productos"
         description="Catálogo del negocio. Crea, edita o desactiva productos con precio, tipo de venta (peso/unidad/sub-unidad), categoría, animal y corte. Adjunta imagen, código de barras, costo y stock inicial."
         actions={
-          <button
-            id="products-new-btn"
-            onClick={() => { setShowForm(true); setEditId(null); setForm(emptForm); setFormImagePreview(null); setFormImageFile(null); }}
-            className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-xs md:text-sm"
-          >
-            <Plus size={16} weight="bold" /> Nuevo Producto
-          </button>
+          <>
+            <FilterDropdown activeCount={pActiveCount} onClear={clearPFilters} storageKey="products" chips={[
+              ...(pFilters.categoryId ? [{ key: 'cat', label: `Cat: ${categories.find((c) => String(c.id) === pFilters.categoryId)?.name}`, onRemove: () => setPFilter('categoryId', '') }] : []),
+              ...(pFilters.supplierId ? [{ key: 'sup', label: `Prov: ${suppliers.find((s) => String(s.id) === pFilters.supplierId)?.name}`, onRemove: () => setPFilter('supplierId', '') }] : []),
+              ...(pFilters.saleType ? [{ key: 'st', label: pFilters.saleType, onRemove: () => setPFilter('saleType', '') }] : []),
+              ...(pFilters.status ? [{ key: 's', label: pFilters.status, onRemove: () => setPFilter('status', '') }] : []),
+            ]}>
+              <Combobox label="Categoría" icon={<Folder size={14} weight="duotone" />} placeholder="Selecciona categoría"
+                options={[{ value: '', label: 'Todas' }, ...categories.map((c) => ({ value: String(c.id), label: c.name }))]}
+                value={pFilters.categoryId} onChange={(v) => setPFilter('categoryId', (v as string) || '')} />
+              <Combobox label="Proveedor" icon={<Truck size={14} weight="duotone" />} placeholder="Selecciona proveedor"
+                options={[{ value: '', label: 'Todos' }, ...suppliers.map((s) => ({ value: String(s.id), label: s.name }))]}
+                value={pFilters.supplierId} onChange={(v) => setPFilter('supplierId', (v as string) || '')} />
+              <Combobox label="Tipo venta" icon={<Scales size={14} weight="duotone" />} placeholder="Selecciona tipo" options={[
+                { value: '', label: 'Todos' }, { value: 'WEIGHT', label: 'Por peso' }, { value: 'UNIT', label: 'Por unidad' }, { value: 'BOTH', label: 'Ambos' },
+              ]} value={pFilters.saleType} onChange={(v) => setPFilter('saleType', (v as string) || '')} />
+              <Combobox label="Estado" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona estado" options={[
+                { value: '', label: 'Todos' }, { value: 'active', label: 'Activos' }, { value: 'inactive', label: 'Inactivos' },
+                { value: 'low', label: 'Stock bajo' }, { value: 'empty', label: 'Agotados' },
+              ]} value={pFilters.status} onChange={(v) => setPFilter('status', (v as string) || '')} />
+              <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
+                { value: 'recent', label: 'Más reciente' }, { value: 'oldest', label: 'Más antiguo' },
+                { value: 'az', label: 'Nombre A-Z' }, { value: 'za', label: 'Nombre Z-A' },
+                { value: 'priceDesc', label: 'Precio mayor a menor' }, { value: 'priceAsc', label: 'Precio menor a mayor' },
+                { value: 'stockDesc', label: 'Más stock' }, { value: 'stockAsc', label: 'Menos stock' },
+              ]} value={(pFilters as any).sort || 'recent'} onChange={(v) => setPFilter('sort' as any, v as any)} clearable={false} />
+            </FilterDropdown>
+            <button
+              id="products-new-btn"
+              onClick={() => { setShowForm(true); setEditId(null); setForm(emptForm); setFormImagePreview(null); setFormImageFile(null); }}
+              className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-xs md:text-sm"
+            >
+              <Plus size={16} weight="bold" /> Nuevo Producto
+            </button>
+          </>
         }
       />
 
@@ -478,41 +506,10 @@ export function ProductsPage() {
         { label: 'Stock bajo', value: products.filter(p => p.active && parseFloat(p.stockQty) <= parseFloat(p.minStock)).length, icon: <WarningCircle size={20} weight="duotone" />, color: 'bg-red-100 text-red-500' },
       ]} />
 
-      <div className="mb-4">
-        <FilterPanel storageKey="products" toggleOnEvent="fameat:toggle-filters"
-          activeCount={pActiveCount}
-          onClear={clearPFilters}
-          chips={[
-            ...(pFilters.categoryId ? [{ key: 'cat', label: `Cat: ${categories.find((c) => String(c.id) === pFilters.categoryId)?.name}`, onRemove: () => setPFilter('categoryId', '') }] : []),
-            ...(pFilters.supplierId ? [{ key: 'sup', label: `Prov: ${suppliers.find((s) => String(s.id) === pFilters.supplierId)?.name}`, onRemove: () => setPFilter('supplierId', '') }] : []),
-            ...(pFilters.saleType ? [{ key: 'st', label: pFilters.saleType, onRemove: () => setPFilter('saleType', '') }] : []),
-            ...(pFilters.status ? [{ key: 's', label: pFilters.status, onRemove: () => setPFilter('status', '') }] : []),
-          ]}
-        >
-          <Combobox label="Categoría" icon={<Folder size={14} weight="duotone" />} placeholder="Selecciona categoría"
-            options={[{ value: '', label: 'Todas' }, ...categories.map((c) => ({ value: String(c.id), label: c.name }))]}
-            value={pFilters.categoryId} onChange={(v) => setPFilter('categoryId', (v as string) || '')} />
-          <Combobox label="Proveedor" icon={<Truck size={14} weight="duotone" />} placeholder="Selecciona proveedor"
-            options={[{ value: '', label: 'Todos' }, ...suppliers.map((s) => ({ value: String(s.id), label: s.name }))]}
-            value={pFilters.supplierId} onChange={(v) => setPFilter('supplierId', (v as string) || '')} />
-          <Combobox label="Tipo venta" icon={<Scales size={14} weight="duotone" />} placeholder="Selecciona tipo" options={[
-            { value: '', label: 'Todos' }, { value: 'WEIGHT', label: 'Por peso' }, { value: 'UNIT', label: 'Por unidad' }, { value: 'BOTH', label: 'Ambos' },
-          ]} value={pFilters.saleType} onChange={(v) => setPFilter('saleType', (v as string) || '')} />
-          <Combobox label="Estado" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona estado" options={[
-            { value: '', label: 'Todos' }, { value: 'active', label: 'Activos' }, { value: 'inactive', label: 'Inactivos' },
-            { value: 'low', label: 'Stock bajo' }, { value: 'empty', label: 'Agotados' },
-          ]} value={pFilters.status} onChange={(v) => setPFilter('status', (v as string) || '')} />
-          <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
-            { value: 'recent', label: 'Más reciente' }, { value: 'oldest', label: 'Más antiguo' },
-            { value: 'az', label: 'Nombre A-Z' }, { value: 'za', label: 'Nombre Z-A' },
-            { value: 'priceDesc', label: 'Precio mayor a menor' }, { value: 'priceAsc', label: 'Precio menor a mayor' },
-            { value: 'stockDesc', label: 'Más stock' }, { value: 'stockAsc', label: 'Menos stock' },
-          ]} value={(pFilters as any).sort || 'recent'} onChange={(v) => setPFilter('sort' as any, v as any)} clearable={false} />
-        </FilterPanel>
-      </div>
-
       <div id="products-list" className="bg-white rounded-xl shadow p-4">
         <ViewToggle storageKey="products" searchInputProps={{ 'data-search-input': '' }}
+          refreshSlot={<RefreshButton onClick={() => load()} loading={loading} />}
+          totalCount={products.length}
           data={filtered}
           searchFilter={(p, q) => p.name.toLowerCase().includes(q) || (p.category?.name || '').toLowerCase().includes(q)}
           searchPlaceholder="Buscar producto..."
@@ -733,15 +730,24 @@ export function ProductsPage() {
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Informacion basica</p>
                   <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="Nombre del producto *" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400 focus:border-transparent" />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} required className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm">
-                      <option value="">Categoria *</option>
-                      {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    <select value={form.saleType} onChange={(e) => setForm({ ...form, saleType: e.target.value as any })} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm">
-                      <option value="WEIGHT">Por peso</option>
-                      <option value="UNIT">Por unidad</option>
-                      <option value="BOTH">Ambos</option>
-                    </select>
+                    <Combobox
+                      label="Categoria *"
+                      placeholder="Buscar categoría..."
+                      options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+                      value={form.categoryId}
+                      onChange={(v) => setForm({ ...form, categoryId: (Array.isArray(v) ? v[0] : v) || '' })}
+                    />
+                    <Combobox
+                      label="Tipo de venta"
+                      placeholder="Seleccionar..."
+                      options={[
+                        { value: 'WEIGHT', label: 'Por peso' },
+                        { value: 'UNIT', label: 'Por unidad' },
+                        { value: 'BOTH', label: 'Ambos' },
+                      ]}
+                      value={form.saleType}
+                      onChange={(v) => setForm({ ...form, saleType: (v || 'WEIGHT') as any })}
+                    />
                   </div>
                 </div>
                 {(form.saleType === 'WEIGHT' || form.saleType === 'BOTH') && (
@@ -832,11 +838,14 @@ export function ProductsPage() {
                       <input type="number" step={form.saleType === 'UNIT' ? '1' : '0.001'} min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Proveedor</label>
-                      <select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm">
-                        <option value="">Ninguno</option>
-                        {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
+                      <Combobox
+                        label="Proveedor"
+                        placeholder="Buscar proveedor..."
+                        options={[{ value: '', label: 'Ninguno' }, ...suppliers.map((s) => ({ value: String(s.id), label: s.name }))]}
+                        value={form.supplierId}
+                        onChange={(v) => setForm({ ...form, supplierId: (Array.isArray(v) ? v[0] : v) || '' })}
+                        clearable
+                      />
                     </div>
                   </div>
                   {/* Equivalencias de peso */}

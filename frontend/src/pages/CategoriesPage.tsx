@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
-import { Folder, Plus, PencilSimple, Trash, X, Tag } from '@phosphor-icons/react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Folder, Plus, PencilSimple, Trash, X, Tag, MagnifyingGlass, Funnel } from '@phosphor-icons/react';
 import toast from 'react-hot-toast';
 import * as categoriesApi from '../api/categories';
 import * as animalPartsApi from '../api/animalParts';
@@ -7,6 +7,7 @@ import type { Category, CookingMethod, AnimalType } from '../api/categories';
 import { COOKING_METHODS, COOKING_METHOD_LABELS, ANIMAL_TYPES, ANIMAL_TYPE_LABELS } from '../api/categories';
 import { Card, Button, Badge, Input, Textarea, Combobox } from '../components/ui';
 import { PageHeader } from '../components/layout/PageHeader';
+import { FilterPanel } from '../components/FilterSection';
 import { Portal } from '../components/Portal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PageSkeleton } from '../components/PageSkeleton';
@@ -47,6 +48,22 @@ export function CategoriesPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [filterAnimal, setFilterAnimal] = useState('');
+  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Global Ctrl+Shift+F
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setFiltersOpen((prev) => !prev);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useModalEscape(showForm ? () => setShowForm(false) : null);
 
@@ -181,6 +198,16 @@ export function CategoriesPage() {
 
   useEnterSubmit(handleSave, showForm);
 
+  const filteredCategories = useMemo(() => {
+    return categories.filter((c) => {
+      if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.description?.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterAnimal && c.animalType !== filterAnimal) return false;
+      if (filterActive === 'active' && !c.active) return false;
+      if (filterActive === 'inactive' && c.active) return false;
+      return true;
+    });
+  }, [categories, search, filterAnimal, filterActive]);
+
   if (loading) return <PageSkeleton type="table" />;
 
   return (
@@ -190,26 +217,84 @@ export function CategoriesPage() {
         title="Categorías"
         description="Agrupa tus productos por categorías con color identificador. Las categorías aparecen como filtros rápidos en el punto de venta y permiten organizar reportes. Configura métodos de cocción sugeridos para carnes y pescados."
         actions={
-          <Button id="categories-new-btn" variant="primary" iconLeft={<Plus size={16} weight="bold" />} onClick={startNew}>
-            Nueva categoría
-          </Button>
+          <>
+            <button
+              onClick={() => setFiltersOpen((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium transition-colors border ${
+                filtersOpen || (search || filterAnimal || filterActive !== 'all')
+                  ? 'bg-red-50 border-red-300 text-red-600 dark:bg-red-900/20 dark:border-red-700 dark:text-red-400'
+                  : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
+              }`}
+              title="Filtros (Ctrl+Shift+F)"
+            >
+              <Funnel size={14} weight="duotone" />
+              <span className="hidden sm:inline">Filtros</span>
+              {(search || filterAnimal || filterActive !== 'all') && (
+                <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold bg-red-500 text-white rounded-full">
+                  {(search ? 1 : 0) + (filterAnimal ? 1 : 0) + (filterActive !== 'all' ? 1 : 0)}
+                </span>
+              )}
+            </button>
+            <Button id="categories-new-btn" variant="primary" iconLeft={<Plus size={16} weight="bold" />} onClick={startNew}>
+              Nueva categoría
+            </Button>
+          </>
         }
       />
 
+      <FilterPanel open={filtersOpen}>
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar categoría..."
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 dark:bg-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+          />
+        </div>
+        <select
+          value={filterAnimal}
+          onChange={(e) => setFilterAnimal(e.target.value)}
+          className="text-xs border border-gray-200 dark:border-gray-700 dark:bg-slate-800 rounded-lg px-3 py-2"
+        >
+          <option value="">Todos los animales</option>
+          {ANIMAL_TYPES.map((a) => <option key={a} value={a}>{ANIMAL_TYPE_LABELS[a]}</option>)}
+        </select>
+        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {(['all', 'active', 'inactive'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilterActive(f)}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${filterActive === f ? 'bg-red-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 hover:bg-gray-50'}`}
+            >
+              {f === 'all' ? 'Todas' : f === 'active' ? 'Activas' : 'Inactivas'}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-gray-400">{filteredCategories.length} categoría(s)</span>
+      </FilterPanel>
+
       <div id="categories-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {categories.length === 0 && (
+        {filteredCategories.length === 0 && (
           <div className="col-span-full flex flex-col items-center justify-center py-12 px-4">
             <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4">
               <Folder size={32} weight="duotone" className="text-gray-400" />
             </div>
-            <p className="font-semibold text-gray-700 dark:text-gray-200 mb-1">Aún no hay categorías</p>
-            <p className="text-sm text-gray-400 mb-4">Crea la primera categoría para organizar tus productos</p>
-            <button onClick={startNew} className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors">
-              <Plus size={16} weight="bold" /> Nueva categoría
-            </button>
+            <p className="font-semibold text-gray-700 dark:text-gray-200 mb-1">{search || filterAnimal || filterActive !== 'all' ? 'Sin resultados' : 'Aún no hay categorías'}</p>
+            <p className="text-sm text-gray-400 mb-4">{search || filterAnimal || filterActive !== 'all' ? 'No hay categorías que coincidan con los filtros' : 'Crea la primera categoría para organizar tus productos'}</p>
+            {search || filterAnimal || filterActive !== 'all' ? (
+              <button onClick={() => { setSearch(''); setFilterAnimal(''); setFilterActive('all'); }} className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+                Limpiar filtros
+              </button>
+            ) : (
+              <button onClick={startNew} className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors">
+                <Plus size={16} weight="bold" /> Nueva categoría
+              </button>
+            )}
           </div>
         )}
-        {categories.map((c) => (
+        {filteredCategories.map((c) => (
           <Card key={c.id} padding="md" className={`relative ${!c.active ? 'opacity-50' : ''}`}>
             <span
               className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"

@@ -87,12 +87,26 @@ function Get-LanIP {
 }
 
 function Test-BuildNeeded {
-    $beDist = Join-Path $baseDir "backend/dist/index.js"
-    $feDist = Join-Path $baseDir "frontend/dist/index.html"
+    $beDist  = Join-Path $baseDir "backend/dist/index.js"
+    $feDist  = Join-Path $baseDir "frontend/dist/index.html"
+    $feIndex = Join-Path $baseDir "frontend/dist/assets/index-sUwDJcnt.js"
+    $swFile  = Join-Path $baseDir "frontend/dist/sw.js"
     if (-not (Test-Path $beDist) -or -not (Test-Path $feDist)) { return $true }
+
     $pkgTime = (Get-Item (Join-Path $baseDir "package.json")).LastWriteTime
-    $distTime = (Get-Item $beDist).LastWriteTime
-    return ($pkgTime -gt $distTime)
+    $beTime  = (Get-Item $beDist).LastWriteTime
+    if ($pkgTime -gt $beTime) { return $true }
+
+    # Verificar que frontend/dist tenga la version del SW actualizada
+    if (Test-Path $swFile) {
+        $swContent = Get-Content $swFile -Raw
+        if ($swContent -notmatch "v1\.4\.0") { return $true }
+    }
+
+    # Verificar que exista el chunk principal del frontend
+    if (-not (Test-Path $feIndex)) { return $true }
+
+    return $false
 }
 
 Clear-Host
@@ -164,14 +178,33 @@ if (Test-BuildNeeded) {
 
 Write-Phase "FASE 3/5 - Verificando recursos del sistema"
 try {
-    $netstatOut = cmd /c "netstat -ano | findstr :3001" 2>$null
+    $pidsOnPort = @()
+    $netstatOut = cmd /c "netstat -ano" 2>$null
     if ($netstatOut) {
-        Write-Warn "Puerto 3001 ocupado. Liberando..."
-        $parts = $netstatOut.Trim().Split(" ", [StringSplitOptions]::RemoveEmptyEntries)
-        $pid = $parts[$parts.Length - 1]
-        if ($pid -as [int] -and $pid -gt 0) {
-            Stop-Process -Id ([int]$pid) -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Milliseconds 500
+        foreach ($line in $netstatOut) {
+            if ($line -match ":3001\s" -and $line -match "LISTENING") {
+                $parts = $line.Trim().Split(" ", [StringSplitOptions]::RemoveEmptyEntries)
+                $rawPid = $parts[$parts.Length - 1]
+                if ($rawPid -as [int] -and [int]$rawPid -gt 0) {
+                    $pidsOnPort += [int]$rawPid
+                }
+            }
+        }
+    }
+    if ($pidsOnPort.Count -gt 0) {
+        $unique = $pidsOnPort | Sort-Object -Unique
+        Write-Warn "Puerto 3001 ocupado por PID(s): $($unique -join ', '). Liberando..."
+        foreach ($pid in $unique) {
+            try { Stop-Process -Id $pid -Force -ErrorAction Stop } catch { }
+        }
+        Start-Sleep -Seconds 2
+        $stillAlive = Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue
+        if ($stillAlive) {
+            Write-Warn "Puerto sigue ocupado, forzando cierre de procesos node en puerto 3001..."
+            foreach ($pid in $unique) {
+                try { Stop-Process -Id $pid -Force -ErrorAction Stop } catch { }
+            }
+            Start-Sleep -Seconds 2
         }
         Write-OK "Puerto liberado"
     } else {
@@ -217,9 +250,11 @@ while ($elapsed -lt $maxWait) {
         $lastMsgIdx = $phaseIdx
     }
     try {
-        $resp = Invoke-WebRequest -Uri "$Url/api/health" -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
-        $serverUp = $true
-        break
+        $resp = Invoke-WebRequest -Uri "$Url/api/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+        if ($resp.StatusCode -eq 200) {
+            $serverUp = $true
+            break
+        }
     } catch { }
     if ($nodeProcess.HasExited) {
         Write-Host ""
@@ -227,6 +262,16 @@ while ($elapsed -lt $maxWait) {
         Read-Host "Presiona Enter para salir"
         exit 1
     }
+}
+
+# Doble verificacion: asegurar que el servidor responde
+if (-not $serverUp) {
+    Write-Warn "Esperando unos segundos adicionales..."
+    Start-Sleep -Seconds 3
+    try {
+        $resp = Invoke-WebRequest -Uri "$Url/api/health" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+        if ($resp.StatusCode -eq 200) { $serverUp = $true }
+    } catch { }
 }
 
 Write-Phase "FASE 5/5 - Iniciando interfaz grafica"

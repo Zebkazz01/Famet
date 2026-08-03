@@ -11,6 +11,7 @@
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
+    "build:vercel": "npx --workspace=backend prisma generate && npm run build --workspace=backend && npm run build --workspace=frontend",
     "build:backend": "npm run build --workspace=backend",
     "build:frontend": "npm run build --workspace=frontend",
     "start": "node backend/dist/index.js",

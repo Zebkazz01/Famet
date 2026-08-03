@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
-import { Database, ArrowsClockwise, FloppyDisk, ArrowCounterClockwise, Warning } from '@phosphor-icons/react';
+import { Database, ArrowsClockwise, FloppyDisk, ArrowCounterClockwise, Warning, MagnifyingGlass, Funnel } from '@phosphor-icons/react';
 import client from '../api/client';
 import { PageHeader } from '../components/layout/PageHeader';
+import { FilterPanel } from '../components/FilterSection';
 import { Portal } from '../components/Portal';
 import { formatDateTime } from '../utils/formatters';
 import { useModalEscape } from '../contexts/ModalStackContext';
@@ -16,6 +17,20 @@ export function BackupsPage() {
   const [restoreText, setRestoreText] = useState('');
   const [dropFirst, setDropFirst] = useState(true);
   const [restoring, setRestoring] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Global Ctrl+Shift+F
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setFiltersOpen((prev) => !prev);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useModalEscape(confirmRestore ? () => setConfirmRestore(null) : null);
 
@@ -60,6 +75,12 @@ export function BackupsPage() {
     return `${(n / 1024 / 1024).toFixed(1)} MB`;
   }
 
+  const filteredList = useMemo(() => {
+    if (!search) return list;
+    const q = search.toLowerCase();
+    return list.filter((b) => b.name.toLowerCase().includes(q));
+  }, [list, search]);
+
   return (
     <div className="flex flex-col h-full p-3 md:p-6">
       <PageHeader
@@ -67,13 +88,44 @@ export function BackupsPage() {
         title="Backups"
         description="Copias de seguridad automáticas de la base de datos. Se ejecutan a las 02:00 todos los días (configurable con BACKUP_CRON) y se retienen 14 días por defecto (BACKUP_RETENTION). Genera dumps PostgreSQL con pg_dump en formato custom (.dump) restaurables con pg_restore."
         actions={
-          <button id="backups-btn" onClick={runNow} disabled={running}
-            className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 disabled:opacity-50 text-xs md:text-sm">
-            <ArrowsClockwise size={16} weight={running ? 'fill' : 'bold'} className={running ? 'animate-spin' : ''} />
-            {running ? 'Generando...' : 'Backup ahora'}
-          </button>
+          <>
+            <button
+              onClick={() => setFiltersOpen((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium transition-colors border ${
+                filtersOpen || search
+                  ? 'bg-red-50 border-red-300 text-red-600 dark:bg-red-900/20 dark:border-red-700 dark:text-red-400'
+                  : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
+              }`}
+              title="Filtros (Ctrl+Shift+F)"
+            >
+              <Funnel size={14} weight="duotone" />
+              <span className="hidden sm:inline">Filtros</span>
+              {search && (
+                <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold bg-red-500 text-white rounded-full">1</span>
+              )}
+            </button>
+            <button id="backups-btn" onClick={runNow} disabled={running}
+              className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 disabled:opacity-50 text-xs md:text-sm">
+              <ArrowsClockwise size={16} weight={running ? 'fill' : 'bold'} className={running ? 'animate-spin' : ''} />
+              {running ? 'Generando...' : 'Backup ahora'}
+            </button>
+          </>
         }
       />
+
+      <FilterPanel open={filtersOpen}>
+        <div className="relative flex-1 max-w-xs">
+          <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar backup..."
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 dark:bg-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+          />
+        </div>
+        <span className="text-xs text-gray-400">{filteredList.length} backup(s)</span>
+      </FilterPanel>
 
       <div className="flex-1 overflow-auto styled-scroll">
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-3 mb-4 text-xs text-blue-900 dark:text-blue-200">

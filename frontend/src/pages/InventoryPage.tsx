@@ -15,7 +15,7 @@ import { BarcodeScanner } from '../components/BarcodeScanner';
 import { useBarcodeResolver } from '../hooks/useBarcodeResolver';
 import { PageHeader } from '../components/layout/PageHeader';
 import { BarcodeConflictModal } from '../components/inventory/BarcodeConflictModal';
-import { FilterPanel, Select, Combobox, Input, Textarea, Button, DateRangePicker } from '../components/ui';
+import { FilterDropdown, RefreshButton, Select, Combobox, Input, Textarea, Button, DateRangePicker } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { useEnterSubmit } from '../hooks/useEnterSubmit';
 import { useScale } from '../contexts/ScaleContext';
@@ -37,6 +37,7 @@ interface Movement {
   newQty: string;
   notes: string | null;
   createdAt: string;
+  productId: number;
   product: { name: string };
   user?: { firstName: string; lastName: string } | null;
   saleId?: number | null;
@@ -188,9 +189,35 @@ export function InventoryPage() {
         title="Inventario"
         description="Registra y consulta movimientos de stock: entradas de mercancía, devoluciones, ajustes, mermas y salidas por venta. Cada movimiento queda trazado con usuario, cantidad anterior/nueva, costo y notas. Revisa también alertas de stock mínimo."
         actions={
-          <button id="inventory-new-movement-btn" onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-red-600 text-xs md:text-sm">
-            <Plus size={16} weight="bold" /> Nuevo Movimiento
-          </button>
+          <>
+            <button id="inventory-new-movement-btn" onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-red-600 text-xs md:text-sm">
+              <Plus size={16} weight="bold" /> Nuevo Movimiento
+            </button>
+            <FilterDropdown activeCount={iActiveCount} onClear={clearIFilters} storageKey="inventory" chips={[
+              ...(iFilters.type ? [{ key: 't', label: iFilters.type, onRemove: () => setIFilter('type', '') }] : []),
+              ...(iFilters.productId ? [{ key: 'p', label: products.find((p) => String(p.id) === iFilters.productId)?.name || '', onRemove: () => setIFilter('productId', '') }] : []),
+              ...((iFilters.range?.from || iFilters.range?.to) ? [{ key: 'd', label: `${iFilters.range.from || '...'} → ${iFilters.range.to || '...'}`, onRemove: () => setIFilter('range', { from: '', to: '' }) }] : []),
+            ]}>
+              <DateRangePicker label="Rango de fechas" value={iFilters.range} onChange={(v) => setIFilter('range', v)} />
+              <Select label="Tipo de movimiento" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona tipo" options={[
+                { value: '', label: 'Todos' },
+                { value: 'ENTRY', label: 'Entrada' },
+                { value: 'SALE', label: 'Venta' },
+                { value: 'ADJUSTMENT', label: 'Ajuste' },
+                { value: 'LOSS', label: 'Merma' },
+                { value: 'RETURN', label: 'Devolución' },
+                { value: 'EXPIRED', label: 'Vencido' },
+              ]} value={iFilters.type} onChange={(e) => setIFilter('type', e.target.value)} />
+              <Combobox label="Producto" icon={<PackageIcon size={14} weight="duotone" />} placeholder="Selecciona producto" options={[{ value: '', label: 'Todos' }, ...products.map((p) => ({ value: String(p.id), label: p.name }))]}
+                value={iFilters.productId} onChange={(v) => setIFilter('productId', (v as string) || '')} />
+              <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
+                { value: 'recent', label: 'Más reciente' },
+                { value: 'oldest', label: 'Más antiguo' },
+                { value: 'qtyDesc', label: 'Cantidad mayor a menor' },
+                { value: 'qtyAsc', label: 'Cantidad menor a mayor' },
+              ]} value={iFilters.sort} onChange={(v) => setIFilter('sort', (v as string) || 'recent')} clearable={false} />
+            </FilterDropdown>
+          </>
         }
       />
 
@@ -198,7 +225,7 @@ export function InventoryPage() {
         // Stats que reflejan los filtros activos cuando estamos en pestaña Movimientos
         const matchesAllFilters = (m: typeof movements[number]): boolean => {
           if (iFilters.type && m.type !== iFilters.type) return false;
-          if (iFilters.productId && !m.product.name.toLowerCase().includes((products.find((p) => String(p.id) === iFilters.productId)?.name || '').toLowerCase())) return false;
+          if (iFilters.productId && String(m.productId) !== iFilters.productId) return false;
           if (iFilters.range?.from) {
             if (new Date(m.createdAt) < new Date(iFilters.range.from + 'T00:00:00')) return false;
           }
@@ -256,41 +283,13 @@ export function InventoryPage() {
 
       {tab === 'movements' && (
         <>
-        <div className="mb-4">
-          <FilterPanel storageKey="inventory" toggleOnEvent="fameat:toggle-filters"
-            activeCount={iActiveCount}
-            onClear={clearIFilters}
-            chips={[
-              ...(iFilters.type ? [{ key: 't', label: iFilters.type, onRemove: () => setIFilter('type', '') }] : []),
-              ...(iFilters.productId ? [{ key: 'p', label: products.find((p) => String(p.id) === iFilters.productId)?.name || '', onRemove: () => setIFilter('productId', '') }] : []),
-              ...((iFilters.range?.from || iFilters.range?.to) ? [{ key: 'd', label: `${iFilters.range.from || '...'} → ${iFilters.range.to || '...'}`, onRemove: () => setIFilter('range', { from: '', to: '' }) }] : []),
-            ]}
-          >
-            <DateRangePicker label="Rango de fechas" value={iFilters.range} onChange={(v) => setIFilter('range', v)} />
-            <Select label="Tipo de movimiento" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona tipo" options={[
-              { value: '', label: 'Todos' },
-              { value: 'ENTRY', label: 'Entrada' },
-              { value: 'SALE', label: 'Venta' },
-              { value: 'ADJUSTMENT', label: 'Ajuste' },
-              { value: 'LOSS', label: 'Merma' },
-              { value: 'RETURN', label: 'Devolución' },
-              { value: 'EXPIRED', label: 'Vencido' },
-            ]} value={iFilters.type} onChange={(e) => setIFilter('type', e.target.value)} />
-            <Combobox label="Producto" icon={<PackageIcon size={14} weight="duotone" />} placeholder="Selecciona producto" options={[{ value: '', label: 'Todos' }, ...products.map((p) => ({ value: String(p.id), label: p.name }))]}
-              value={iFilters.productId} onChange={(v) => setIFilter('productId', (v as string) || '')} />
-            <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
-              { value: 'recent', label: 'Más reciente' },
-              { value: 'oldest', label: 'Más antiguo' },
-              { value: 'qtyDesc', label: 'Cantidad mayor a menor' },
-              { value: 'qtyAsc', label: 'Cantidad menor a mayor' },
-            ]} value={iFilters.sort} onChange={(v) => setIFilter('sort', (v as string) || 'recent')} clearable={false} />
-          </FilterPanel>
-        </div>
         <div id="inventory-list" className="bg-white rounded-xl shadow p-4">
           <ViewToggle storageKey="inventory" searchInputProps={{ 'data-search-input': '' }}
+            refreshSlot={<RefreshButton onClick={() => load()} loading={loading} />}
+            totalCount={movements.length}
             data={movements.filter((m) => {
               if (iFilters.type && m.type !== iFilters.type) return false;
-              if (iFilters.productId && !m.product.name.toLowerCase().includes((products.find((p) => String(p.id) === iFilters.productId)?.name || '').toLowerCase())) return false;
+              if (iFilters.productId && String(m.productId) !== iFilters.productId) return false;
               if (iFilters.range?.from && new Date(m.createdAt) < new Date(iFilters.range.from + 'T00:00:00')) return false;
               if (iFilters.range?.to && new Date(m.createdAt) > new Date(iFilters.range.to + 'T23:59:59')) return false;
               return true;
@@ -343,6 +342,8 @@ export function InventoryPage() {
       {tab === 'alerts' && (
         <div className="bg-white rounded-xl shadow p-4">
           <ViewToggle storageKey="inventory" searchInputProps={{ 'data-search-input': '' }}
+            refreshSlot={<RefreshButton onClick={() => load()} loading={loading} />}
+            totalCount={alerts.length}
             data={alerts}
             keyField="id"
             searchFilter={(p, q) => p.name.toLowerCase().includes(q)}

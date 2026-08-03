@@ -5,6 +5,7 @@ import { CreateSaleInput, CorrectSaleInput } from "./sales.schema";
 import { AppError } from "../../middleware/errorHandler";
 import * as expiryService from "../expiry/expiryService";
 import { evaluate as evaluateDiscounts } from "../discounts/discountEngine";
+import { parseBusinessDateParam, getBusinessDayDate, getBusinessDayStart, getBusinessDayEnd } from "../../utils/businessDay";
 
 /** Redondea un valor Decimal o number al peso colombiano más cercano (sin decimales) */
 function roundPeso(val: Decimal | number): Decimal {
@@ -216,16 +217,11 @@ export async function createSale(req: Request, res: Response, next?: any) {
 }
 
 function parseDateParam(value: string, endOfDay: boolean): Date {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [y, m, d] = value.split("-").map(Number);
-    if (endOfDay) return new Date(y, m - 1, d, 23, 59, 59, 999);
-    return new Date(y, m - 1, d);
-  }
-  return new Date(value);
+  return parseBusinessDateParam(value, endOfDay);
 }
 
 export async function getSales(req: Request, res: Response) {
-  const { from, to, limit } = req.query;
+  const { from, to, limit, animalType } = req.query;
 
   const where: any = {};
   if (from || to) {
@@ -239,22 +235,37 @@ export async function getSales(req: Request, res: Response) {
     where.userId = req.user!.userId;
   }
 
+  // Filter by animal type if specified
+  if (animalType && typeof animalType === 'string') {
+    where.items = {
+      some: {
+        product: {
+          animalType: animalType as any,
+        },
+      },
+    };
+  }
+
   const sales = await prisma.sale.findMany({
     where,
     include: {
       user: { select: { firstName: true, lastName: true } },
       customer: { select: { id: true, name: true } },
-      items: { select: { product: { select: { name: true } } } },
+      items: { select: { product: { select: { name: true, animalType: true } } } },
       _count: { select: { items: true } },
     },
     orderBy: { createdAt: "desc" },
     take: limit ? Number(limit) : 50,
   });
 
-  const result = sales.map((sale) => ({
-    ...sale,
-    productNames: [...new Set(sale.items.map((i: any) => i.product.name))].join(", "),
-  }));
+  const result = sales.map((sale) => {
+    const animalTypes = [...new Set(sale.items.map((i: any) => i.product.animalType).filter(Boolean))];
+    return {
+      ...sale,
+      productNames: [...new Set(sale.items.map((i: any) => i.product.name))].join(", "),
+      animalTypes,
+    };
+  });
   return res.json(result);
 }
 
@@ -273,9 +284,9 @@ export async function getSale(req: Request, res: Response) {
 }
 
 export async function getDailySummary(req: Request, res: Response) {
-  const date = req.query.date ? String(req.query.date) : new Date().toISOString().split("T")[0];
-  const startOfDay = parseDateParam(date, false);
-  const endOfDay = parseDateParam(date, true);
+  const date = req.query.date ? String(req.query.date) : getBusinessDayDate();
+  const startOfDay = getBusinessDayStart(date);
+  const endOfDay = getBusinessDayEnd(date);
 
   const sales = await prisma.sale.findMany({
     where: { createdAt: { gte: startOfDay, lte: endOfDay } },

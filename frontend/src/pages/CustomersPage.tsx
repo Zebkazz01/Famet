@@ -8,7 +8,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Portal } from '../components/Portal';
 import { PageSkeleton } from '../components/PageSkeleton';
 import { ViewToggle } from '../components/ViewToggle';
-import { FilterPanel, Combobox } from '../components/ui';
+import { FilterDropdown, RefreshButton, Combobox } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { useEnterSubmit } from '../hooks/useEnterSubmit';
 import { useModalEscape } from '../contexts/ModalStackContext';
@@ -142,9 +142,37 @@ export function CustomersPage() {
         title="Clientes"
         description="Base de clientes para gestionar crédito, abonos y descuentos personalizados. Registra ventas a crédito, controla saldos, recibe pagos parciales y consulta historial."
         actions={
-          <button id="customers-new-btn" onClick={startNew} className="inline-flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-lg hover:from-red-600 hover:to-red-700 text-xs md:text-sm shadow-md hover:shadow-lg transition-all font-medium">
-            <Plus size={16} weight="bold" /> Nuevo Cliente
-          </button>
+          <>
+            <FilterDropdown activeCount={cActiveCount} onClear={clearCFilters} chips={[
+              ...(cFilters.debtStatus ? [{ key: 'debt', label: cFilters.debtStatus === 'debt' ? 'Con deuda' : 'Sin deuda', onRemove: () => setCFilter('debtStatus', '') }] : []),
+              ...(cFilters.discountStatus ? [{ key: 'disc', label: cFilters.discountStatus === 'withDiscount' ? 'Con descuento' : 'Sin descuento', onRemove: () => setCFilter('discountStatus', '') }] : []),
+            ]} storageKey="customers">
+              <Combobox label="Estado de deuda" icon={<Warning size={14} weight="duotone" />} placeholder="Selecciona estado"
+                options={[
+                  { value: '', label: 'Todos' },
+                  { value: 'debt', label: 'Con deuda' },
+                  { value: 'noDebt', label: 'Sin deuda' },
+                ]}
+                value={cFilters.debtStatus} onChange={(v) => setCFilter('debtStatus', (v as string) || '')} />
+              <Combobox label="Descuento" icon={<Tag size={14} weight="duotone" />} placeholder="Selecciona descuento"
+                options={[
+                  { value: '', label: 'Todos' },
+                  { value: 'withDiscount', label: 'Con descuento' },
+                  { value: 'noDiscount', label: 'Sin descuento' },
+                ]}
+                value={cFilters.discountStatus} onChange={(v) => setCFilter('discountStatus', (v as string) || '')} />
+              <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
+                { value: 'name', label: 'Nombre A-Z' },
+                { value: 'recent', label: 'Más recientes' },
+                { value: 'debtDesc', label: 'Mayor deuda' },
+                { value: 'debtAsc', label: 'Menor deuda' },
+                { value: 'discountDesc', label: 'Mayor descuento' },
+              ]} value={cFilters.sort || 'name'} onChange={(v) => setCFilter('sort', (v as string) || '')} clearable={false} />
+            </FilterDropdown>
+            <button id="customers-new-btn" onClick={startNew} className="inline-flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-lg hover:from-red-600 hover:to-red-700 text-xs md:text-sm shadow-md hover:shadow-lg transition-all font-medium">
+              <Plus size={16} weight="bold" /> Nuevo Cliente
+            </button>
+          </>
         }
       />
 
@@ -191,46 +219,14 @@ export function CustomersPage() {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="mb-4">
-        <FilterPanel storageKey="customers" toggleOnEvent="fameat:toggle-filters"
-          activeCount={cActiveCount}
-          onClear={clearCFilters}
-          chips={[
-            ...(cFilters.debtStatus ? [{ key: 'debt', label: cFilters.debtStatus === 'debt' ? 'Con deuda' : 'Sin deuda', onRemove: () => setCFilter('debtStatus', '') }] : []),
-            ...(cFilters.discountStatus ? [{ key: 'disc', label: cFilters.discountStatus === 'withDiscount' ? 'Con descuento' : 'Sin descuento', onRemove: () => setCFilter('discountStatus', '') }] : []),
-          ]}
-        >
-          <Combobox label="Estado de deuda" icon={<Warning size={14} weight="duotone" />} placeholder="Selecciona estado"
-            options={[
-              { value: '', label: 'Todos' },
-              { value: 'debt', label: 'Con deuda' },
-              { value: 'noDebt', label: 'Sin deuda' },
-            ]}
-            value={cFilters.debtStatus} onChange={(v) => setCFilter('debtStatus', (v as string) || '')} />
-          <Combobox label="Descuento" icon={<Tag size={14} weight="duotone" />} placeholder="Selecciona descuento"
-            options={[
-              { value: '', label: 'Todos' },
-              { value: 'withDiscount', label: 'Con descuento' },
-              { value: 'noDiscount', label: 'Sin descuento' },
-            ]}
-            value={cFilters.discountStatus} onChange={(v) => setCFilter('discountStatus', (v as string) || '')} />
-          <Combobox label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
-            { value: 'name', label: 'Nombre A-Z' },
-            { value: 'recent', label: 'Más recientes' },
-            { value: 'debtDesc', label: 'Mayor deuda' },
-            { value: 'debtAsc', label: 'Menor deuda' },
-            { value: 'discountDesc', label: 'Mayor descuento' },
-          ]} value={cFilters.sort || 'name'} onChange={(v) => setCFilter('sort', (v as string) || '')} clearable={false} />
-        </FilterPanel>
-      </div>
-
       {/* Lista de clientes — tabla / tarjetas */}
       <div id="customers-list" className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-3">
         <ViewToggle
           storageKey="customers" searchInputProps={{ 'data-search-input': '' }}
           data={filtered}
           keyField="id"
+          refreshSlot={<RefreshButton onClick={() => load()} loading={loading} />}
+          totalCount={list.length}
           searchPlaceholder="Buscar por nombre, teléfono o documento..."
           searchFilter={(c, query) =>
             c.name.toLowerCase().includes(query) ||

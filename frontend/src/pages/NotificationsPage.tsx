@@ -11,11 +11,12 @@ import * as notifApi from '../api/notifications';
 import type { ServerNotification, NotificationFilter, ServerNotificationType, NotificationSort, NotificationScope } from '../contexts/NotificationContext';
 import client from '../api/client';
 import {
-  Card, Button, Badge, Input, Select, FilterPanel, Tabs, TabList, Tab, TabPanel, SkeletonListItem, DateRangePicker,
+  Card, Button, Badge, Input, Select, FilterDropdown, RefreshButton, Tabs, TabList, Tab, TabPanel, SkeletonListItem, DateRangePicker,
 } from '../components/ui';
 import type { DateRange } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { PageHeader } from '../components/layout/PageHeader';
+import { ViewToggle } from '../components/ViewToggle';
 import toast from 'react-hot-toast';
 
 const TYPE_ICONS: Record<ServerNotificationType, { icon: typeof Bell; color: string; bg: string }> = {
@@ -208,6 +209,7 @@ export function NotificationsPage() {
         description={`Centro de alertas del sistema: stock bajo, productos por vencer, ventas registradas, ajustes de inventario, cierres de caja y eventos importantes. Filtra por tipo, fecha o usuario y archiva las que ya leíste.${isAdmin && filters.scope === 'all' ? ' Modo admin: viendo notificaciones de todos los usuarios.' : ''}`}
         actions={
           <>
+            <RefreshButton onClick={() => fetchPage(true)} loading={loading} />
             <Button
               size="sm"
               variant="outline"
@@ -217,77 +219,63 @@ export function NotificationsPage() {
             >
               Marcar todas leídas
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              iconLeft={<ArrowCounterClockwise size={14} />}
-              onClick={() => fetchPage(true)}
-              loading={loading}
-            >
-              Refrescar
-            </Button>
+            <FilterDropdown activeCount={activeCount} onClear={clear} chips={[
+              ...(filters.type ? [{ key: 'type', label: `Tipo: ${TYPE_OPTIONS.find((o) => o.value === filters.type)?.label}`, onRemove: () => setFilter('type', '') }] : []),
+              ...(filters.q ? [{ key: 'q', label: `Búsqueda: "${filters.q}"`, onRemove: () => setFilter('q', '') }] : []),
+              ...(filters.sort !== 'newest' ? [{ key: 'sort', label: 'Orden: Más antiguas', onRemove: () => setFilter('sort', 'newest') }] : []),
+              ...(filters.range?.from || filters.range?.to ? [{ key: 'range', label: `Fecha: ${filters.range.from || '...'} → ${filters.range.to || '...'}`, onRemove: () => setFilter('range', { from: '', to: '' }) }] : []),
+              ...(isAdmin && filters.scope === 'all' ? [{ key: 'scope', label: 'Alcance: Todas', onRemove: () => setFilter('scope', 'mine') }] : []),
+              ...(isAdmin && filters.userId ? [{ key: 'userId', label: `Usuario: ${users.find((u) => String(u.id) === filters.userId)?.username || filters.userId}`, onRemove: () => setFilter('userId', '') }] : []),
+            ]} storageKey="notifications">
+              <Input
+                label="Buscar"
+                placeholder="Título o mensaje..."
+                value={filters.q}
+                onChange={(e) => setFilter('q', e.target.value)}
+                prefix={<MagnifyingGlass size={14} />}
+              />
+              <Select
+                label="Tipo"
+                icon={<Bell size={14} weight="duotone" />}
+                placeholder="Selecciona tipo"
+                options={TYPE_OPTIONS}
+                value={filters.type}
+                onChange={(e) => setFilter('type', e.target.value)}
+              />
+              <Select
+                label="Orden"
+                icon={filters.sort === 'newest' ? <SortDescending size={14} weight="duotone" /> : <SortAscending size={14} weight="duotone" />}
+                options={SORT_OPTIONS}
+                value={filters.sort}
+                onChange={(e) => setFilter('sort', e.target.value as NotificationSort)}
+              />
+              <DateRangePicker
+                label="Rango de fechas"
+                value={filters.range}
+                onChange={(r) => setFilter('range', r)}
+              />
+              {isAdmin && (
+                <Select
+                  label="Alcance"
+                  icon={<UserIcon size={14} weight="duotone" />}
+                  options={scopeOptions}
+                  value={filters.scope}
+                  onChange={(e) => setFilter('scope', e.target.value as NotificationScope)}
+                />
+              )}
+              {isAdmin && filters.scope === 'all' && (
+                <Select
+                  label="Usuario"
+                  icon={<UserIcon size={14} weight="duotone" />}
+                  options={userOptions}
+                  value={filters.userId}
+                  onChange={(e) => setFilter('userId', e.target.value)}
+                />
+              )}
+            </FilterDropdown>
           </>
         }
       />
-
-      <FilterPanel storageKey="notifications"
-        activeCount={activeCount}
-        onClear={clear}
-        chips={[
-          ...(filters.type ? [{ key: 'type', label: `Tipo: ${TYPE_OPTIONS.find((o) => o.value === filters.type)?.label}`, onRemove: () => setFilter('type', '') }] : []),
-          ...(filters.q ? [{ key: 'q', label: `Búsqueda: "${filters.q}"`, onRemove: () => setFilter('q', '') }] : []),
-          ...(filters.sort !== 'newest' ? [{ key: 'sort', label: 'Orden: Más antiguas', onRemove: () => setFilter('sort', 'newest') }] : []),
-          ...(filters.range?.from || filters.range?.to ? [{ key: 'range', label: `Fecha: ${filters.range.from || '...'} → ${filters.range.to || '...'}`, onRemove: () => setFilter('range', { from: '', to: '' }) }] : []),
-          ...(isAdmin && filters.scope === 'all' ? [{ key: 'scope', label: 'Alcance: Todas', onRemove: () => setFilter('scope', 'mine') }] : []),
-          ...(isAdmin && filters.userId ? [{ key: 'userId', label: `Usuario: ${users.find((u) => String(u.id) === filters.userId)?.username || filters.userId}`, onRemove: () => setFilter('userId', '') }] : []),
-        ]}
-      >
-        <Input
-          label="Buscar"
-          placeholder="Título o mensaje..."
-          value={filters.q}
-          onChange={(e) => setFilter('q', e.target.value)}
-          prefix={<MagnifyingGlass size={14} />}
-        />
-        <Select
-          label="Tipo"
-          icon={<Bell size={14} weight="duotone" />}
-          placeholder="Selecciona tipo"
-          options={TYPE_OPTIONS}
-          value={filters.type}
-          onChange={(e) => setFilter('type', e.target.value)}
-        />
-        <Select
-          label="Orden"
-          icon={filters.sort === 'newest' ? <SortDescending size={14} weight="duotone" /> : <SortAscending size={14} weight="duotone" />}
-          options={SORT_OPTIONS}
-          value={filters.sort}
-          onChange={(e) => setFilter('sort', e.target.value as NotificationSort)}
-        />
-        <DateRangePicker
-          label="Rango de fechas"
-          value={filters.range}
-          onChange={(r) => setFilter('range', r)}
-        />
-        {isAdmin && (
-          <Select
-            label="Alcance"
-            icon={<UserIcon size={14} weight="duotone" />}
-            options={scopeOptions}
-            value={filters.scope}
-            onChange={(e) => setFilter('scope', e.target.value as NotificationScope)}
-          />
-        )}
-        {isAdmin && filters.scope === 'all' && (
-          <Select
-            label="Usuario"
-            icon={<UserIcon size={14} weight="duotone" />}
-            options={userOptions}
-            value={filters.userId}
-            onChange={(e) => setFilter('userId', e.target.value)}
-          />
-        )}
-      </FilterPanel>
 
       <Card id="notifs-tabs" padding="none">
         <Tabs value={tab} onChange={(v) => setTab(v as TabValue)}>

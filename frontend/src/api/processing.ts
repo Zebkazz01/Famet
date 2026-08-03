@@ -129,6 +129,11 @@ export async function cancel(id: number) {
   return res.data as ProcessingBatch;
 }
 
+export async function revert(id: number) {
+  const res = await client.post(`/processing/${id}/revert`);
+  return res.data as ProcessingBatch;
+}
+
 export async function remove(id: number) {
   const res = await client.delete(`/processing/${id}`);
   return res.data;
