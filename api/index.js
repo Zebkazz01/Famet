@@ -36,7 +36,7 @@ const SALES=[
 {id:1004,total:'8500.00',paymentMethod:'TRANSFER',createdAt:'2026-06-01T10:20:00.000Z',user:{firstName:'Carlos',lastName:'López'},_count:{items:2},items:[{product:{name:'Cerveza Águila'},quantity:'1.000',subtotal:'3500.00'},{product:{name:'Gaseosa Coca-Cola 1.5L'},quantity:'1.000',subtotal:'5500.00'}]}
 ];
 const CUSTOMERS=[{id:1,name:'Juan Pérez',phone:'3101234567',document:'1234567890',currentDebt:'0.00',creditLimit:'500000.00',discountPercent:'5.00',active:true},{id:2,name:'María García',phone:'3159876543',document:'0987654321',currentDebt:'25000.00',creditLimit:'300000.00',discountPercent:null,active:true}];
-const SUPPLIERS=[{id:1,name:'Distribuidora Central',nit:'900123456',phone:'3101112233',email:'ventas@distcentral.com',active:true},{id:2,name:'Avícola del Norte',nit:'900789012',phone:'3154445566',contact:'pedidos@avinorte.com',active:true}];
+const SUPPLIERS=[{id:1,name:'Distribuidora Central',nit:'900123456',phone:'3101112233',email:'ventas@distcentral.com',active:true,_count:{products:0}},{id:2,name:'Avícola del Norte',nit:'900789012',phone:'3154445566',contact:'pedidos@avinorte.com',active:true,_count:{products:0}}];
 const EXPENSES=[{id:1,amount:'50000.00',description:'Servicios públicos',category:'Servicios',date:'2026-06-01T00:00:00.000Z',paymentMethod:'CASH'},{id:2,amount:'25000.00',description:'Papelería',category:'Suministros',date:'2026-06-01T00:00:00.000Z',paymentMethod:'CARD'}];
 const USERS=[{id:1,firstName:'Admin',lastName:'Sistema',role:'ADMIN'},{id:2,firstName:'María',lastName:'García',role:'SUPERVISOR'},{id:3,firstName:'Carlos',lastName:'López',role:'VENDEDOR'}];
 
@@ -94,20 +94,29 @@ loadHandler('sales-summary', salesSummary);
 const cashStatus = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({isOpen:true,openingAmount:200000,currentBalance:247500,openedBy:{firstName:'Carlos',lastName:'López'},openedAt:'2026-06-01T08:00:00.000Z'}); }};
 loadHandler('cash-status', cashStatus);
 
-const reportsSales = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({items:[],total:0}); }};
-loadHandler('reports-sales', reportsSales);
+const reportsSales = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({range:{from:req.query.from||'','to:':req.query.to||''},totals:{salesCount:4,grossRevenue:93500,discountTotal:0,netRevenue:93500,totalCost:0,grossProfit:93500,expensesTotal:75000,cashIn:73000,cashOut:0,netIncome:18500},topProducts:[{productId:4,name:'Lomo de Res',qty:1,revenue:28000,cost:28000,profit:0},{productId:1,name:'Huevos AA',qty:1,revenue:15000,cost:0,profit:15000},{productId:3,name:'Pechuga de Pollo',qty:1,revenue:12000,cost:0,profit:12000},{productId:5,name:'Cerveza Águila',qty:5,revenue:17500,cost:0,profit:17500},{productId:8,name:'Gaseosa Coca-Cola 1.5L',qty:1,revenue:5500,cost:0,profit:5500}],worstProducts:[],byCategory:[{categoryId:2,name:'Carnes',qty:3,revenue:49500},{categoryId:3,name:'Bebidas',qty:6,revenue:26500},{categoryId:1,name:'Lácteos',qty:1,revenue:15000}],byPayment:[{method:'CASH',total:73000,count:3},{method:'CARD',total:12000,count:1},{method:'TRANSFER',total:8500,count:1}],expensesByCategory:[{category:'Servicios',amount:50000},{category:'Suministros',amount:25000}],daily:[{date:'2026-06-01',sales:4,revenue:93500,expenses:75000,net:18500}]}); }};
+loadHandler('reports/sales', reportsSales);
 
-const reportsFinancial = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({totalRevenue:93500,totalExpenses:75000,netProfit:18500,categoryBreakdown:[]}); }};
-loadHandler('reports-financial', reportsFinancial);
+const reportsFinancial = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({range:{from:req.query.from||'','to':req.query.to||''},totals:{salesCount:4,grossRevenue:93500,discountTotal:0,netRevenue:93500,totalCost:0,grossProfit:93500,expensesTotal:75000,cashIn:73000,cashOut:0,netIncome:18500},topProducts:[{productId:4,name:'Lomo de Res',qty:1,revenue:28000,cost:28000,profit:0},{productId:1,name:'Huevos AA',qty:1,revenue:15000,cost:0,profit:15000}],worstProducts:[],byCategory:[{categoryId:2,name:'Carnes',qty:3,revenue:49500},{categoryId:3,name:'Bebidas',qty:6,revenue:26500}],byPayment:[{method:'CASH',total:73000,count:3},{method:'CARD',total:12000,count:1}],expensesByCategory:[{category:'Servicios',amount:50000},{category:'Suministros',amount:25000}],daily:[{date:'2026-06-01',sales:4,revenue:93500,expenses:75000,net:18500}]}); }};
+loadHandler('reports/financial', reportsFinancial);
 
-const reportsInventory = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({items:[],totalProducts:8}); }};
-loadHandler('reports-inventory', reportsInventory);
+const reportsInventory = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({items:[{productId:1,name:'Huevos AA',qty:150,revenue:2250000,cost:225000},{productId:4,name:'Lomo de Res',qty:12,revenue:336000,cost:336000}],totalValue:2586000}); }};
+loadHandler('reports/inventory', reportsInventory);
 
-const purchaseOrders = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); if(req.method==='POST') return res.status(201).json({id:Date.now(),...req.body}); res.status(200).json({items:[],nextCursor:null}); }};
+const monthlyStatements = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json([{id:1,month:'2026-05',totalSales:'93500',totalExpenses:'75000',totalDiscounts:'0',totalCashIn:'73000',totalCashOut:'0',netIncome:'18500',salesCount:4,topProductsJson:[],byCategoryJson:[],byPaymentJson:[],createdBy:1,createdAt:'2026-06-01T00:00:00.000Z'}]); }};
+loadHandler('reports/monthly-statements', monthlyStatements);
+
+const monthlyClose = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','POST,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({message:'Mes cerrado correctamente',month:req.body.month}); }};
+loadHandler('reports/monthly-close', monthlyClose);
+
+const purchaseOrders = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); if(req.method==='POST') return res.status(201).json({id:Date.now(),...req.body,code:'OC-'+Date.now(),status:'DRAFT',createdAt:new Date().toISOString(),items:[],total:'0.00',subtotal:'0.00',tax:'0.00'}); res.status(200).json([]); }};
 loadHandler('purchase-orders', purchaseOrders);
 
-const discountRules = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,DELETE,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); if(req.method==='POST') return res.status(201).json({id:Date.now(),...req.body}); res.status(200).json({items:[],nextCursor:null}); }};
+const discountRules = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,DELETE,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); if(req.method==='POST') return res.status(201).json({id:Date.now(),...req.body}); res.status(200).json([]); }};
 loadHandler('discount-rules', discountRules);
+
+const expensesSummary = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({totalExpenses:75000,totalByCategory:[]}); }};
+loadHandler('expenses/summary', expensesSummary);
 
 const manifestHandler = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.setHeader('Content-Type','application/json'); res.status(200).json({name:'FAMEAT POS',short_name:'FAMEAT',description:'Sistema de Punto de Venta con balanza digital',start_url:'/',display:'standalone',background_color:'#ffffff',theme_color:'#dc2626',icons:[]}); }};
 loadHandler('manifest.json', manifestHandler);
@@ -151,8 +160,11 @@ const ROUTE_MAP = {
   'reports/sales': 'reports-sales',
   'reports/financial': 'reports-financial',
   'reports/inventory': 'reports-inventory',
+  'reports/monthly-statements': 'reports-monthly-statements',
+  'reports/monthly-close': 'reports-monthly-close',
   'purchase-orders': 'purchase-orders',
   'discount-rules': 'discount-rules',
+  'expenses/summary': 'expenses/summary',
   'manifest.json': 'manifest.json',
   'network': 'network',
   'processing': 'processing',
