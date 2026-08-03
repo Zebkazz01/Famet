@@ -154,8 +154,8 @@ async function main() {
   }
 
   // Procesamiento
-  const resCutsCat = await prisma.category.findFirst({ where: { name: "Carnes" } });
-  if (!resCutsCat) throw new Error("Categoría Carnes no encontrada");
+  const resCutsCat = await prisma.category.findFirst({ where: { name: "Res" } });
+  if (!resCutsCat) throw new Error("Categoría Res no encontrada");
 
   // Buscar productos ya existentes del seed anterior
   const existingBistec = await prisma.product.findFirst({ where: { name: "Bistec de Res" } });
