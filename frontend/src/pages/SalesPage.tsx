@@ -336,7 +336,7 @@ export function SalesPage() {
             return 0;
           })}
           keyField="id"
-          searchFilter={(s, q) => `${s.id}`.includes(q) || `${s.user.firstName} ${s.user.lastName}`.toLowerCase().includes(q) || s.productNames.toLowerCase().includes(q)}
+          searchFilter={(s, q) => `${s.id}`.includes(q) || `${s.user?.firstName ?? ''} ${s.user?.lastName ?? ''}`.toLowerCase().includes(q) || s.productNames.toLowerCase().includes(q)}
           searchPlaceholder="Buscar por #, cajero o producto..."
           cardTitle={(s) => <span className="cursor-pointer" onClick={() => viewDetail(s.id)}>Venta #{s.id}</span>}
           cardSubtitle={(s) => formatDateTime(s.createdAt)}
@@ -370,7 +370,7 @@ export function SalesPage() {
             { key: 'id', label: '#', render: (s) => <span className="cursor-pointer text-blue-600" onClick={() => viewDetail(s.id)}>{s.id}</span>, cardHidden: true },
             { key: 'date', label: 'Fecha', render: (s) => formatDateTime(s.createdAt), cardHidden: true },
             { key: 'cashier', label: 'Cajero', render: (s) => `${s.user.firstName} ${s.user.lastName}` },
-            { key: 'items', label: 'Items', render: (s) => s._count.items },
+            { key: 'items', label: 'Items', render: (s) => s._count?.items ?? 0 },
             { key: 'payment', label: 'Pago', render: (s) => {
               if (s.isCredit) {
                 const paid = Number(s.creditBalance || 0) <= 0;
@@ -417,11 +417,11 @@ export function SalesPage() {
                   <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">
                     Venta #{detail.id}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap mt-0.5">
-                    <span>{formatDateTime(detail.createdAt)}</span>
-                    <span className="text-gray-300">·</span>
-                    <span>{detail.user.firstName} {detail.user.lastName}</span>
-                  </p>
+<p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+	                        <span>{formatDateTime(detail.createdAt)}</span>
+	                        <span className="text-gray-300">·</span>
+	                        <span>{detail.user?.firstName ?? ''} {detail.user?.lastName ?? ''}</span>
+	                      </p>
                 </div>
               </div>
               <button onClick={closeDetail}
@@ -483,13 +483,13 @@ export function SalesPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-4 border-b border-gray-100 dark:border-gray-700">
                 <div className="bg-gray-50 dark:bg-slate-900/50 rounded-lg px-3 py-2">
                   <p className="text-[10px] uppercase tracking-wide text-gray-400">Productos</p>
-                  <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">{detail.items.length}</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">{detail.items?.length ?? 0}</p>
                 </div>
                 <div className="bg-gray-50 dark:bg-slate-900/50 rounded-lg px-3 py-2">
                   <p className="text-[10px] uppercase tracking-wide text-gray-400">Unidades</p>
-                  <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">
-                    {detail.items.reduce((s, i) => s + parseFloat(i.quantity), 0).toFixed(2)}
-                  </p>
+<p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">
+	                    {detail.items?.reduce((s, i) => s + parseFloat(i.quantity), 0).toFixed(2) ?? '0'}
+	                  </p>
                 </div>
                 <div className="bg-gray-50 dark:bg-slate-900/50 rounded-lg px-3 py-2">
                   <p className="text-[10px] uppercase tracking-wide text-gray-400">Pago</p>
@@ -522,7 +522,7 @@ export function SalesPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {detail.items.map((item, i) => {
+                      {detail.items?.map((item, i) => {
                         const unitLabel = item.isSubUnit
                           ? (item.product.subUnitName || 'ud')
                           : item.product.saleType === 'WEIGHT'

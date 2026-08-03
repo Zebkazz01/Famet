@@ -13,6 +13,12 @@ const httpsConfig = wantHttps && certExists
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), fameatBanner()],
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom'],
+  },
   clearScreen: false,
   server: {
     port: 5173,

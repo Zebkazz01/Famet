@@ -300,23 +300,37 @@ Write-Step "Abriendo navegador..." "Green"
 $browserProc = Open-Browser -BrowserPath $BrowserPath -Url $Url
 Send-F11 -BrowserProc $browserProc
 
-if ($browserProc) {
+Write-Host ""
+Write-Host "  ==========================================" -ForegroundColor DarkYellow
+Write-Host "  >>  Presiona Ctrl+C para detener" -ForegroundColor Yellow
+Write-Host "  >>  el servidor" -ForegroundColor Yellow
+Write-Host "  ==========================================" -ForegroundColor DarkYellow
+Write-Host ""
+Write-Step "Servidor activo - esperando cierre..." "DarkGray"
+
+$cleanupDone = $false
+$cleanup = {
+    if ($cleanupDone) { return }
+    $cleanupDone = $true
     Write-Host ""
-    Write-Host "  ==========================================" -ForegroundColor DarkYellow
-    Write-Host "  >>  Cierra el navegador para" -ForegroundColor Yellow
-    Write-Host "  >>  detener el servidor" -ForegroundColor Yellow
-    Write-Host "  ==========================================" -ForegroundColor DarkYellow
-    Write-Host ""
-    Write-Step "Servidor activo - esperando cierre..." "DarkGray"
-    try { $browserProc.WaitForExit() } catch { }
-    Write-Host ""
-    Write-Warn "Navegador cerrado. Deteniendo servidor..."
+    Write-Warn "Deteniendo servidor..."
+    if (-not $nodeProcess.HasExited) {
+        try { $nodeProcess.Kill() } catch { }
+    }
+    Write-OK "Servidor detenido"
 }
 
-if (-not $nodeProcess.HasExited) {
-    try { $nodeProcess.Kill() } catch { }
+try {
+    while (-not $nodeProcess.HasExited) {
+        Start-Sleep -Seconds 2
+    }
+    Write-Host ""
+    Write-Error "El servidor se cerro inesperadamente."
+} catch {
+    & $cleanup
+    exit 1
 }
 
-Write-OK "Servidor detenido"
+& $cleanup
 Start-Sleep -Seconds 2
 exit 0
