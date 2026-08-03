@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import client from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
+import { getBusinessDayDate, getTodayCalendarDate } from '../utils/businessDay';
 import toast from 'react-hot-toast';
 import { CurrencyDollar, Plus, Vault, X, ArrowDown, ArrowUp, Wallet, Funnel, SortAscending, Trash, Eye } from '@phosphor-icons/react';
 
@@ -12,7 +13,7 @@ import { StatsCards } from '../components/StatsCards';
 import { PageSkeleton } from '../components/PageSkeleton';
 import { ErrorView } from '../components/ErrorBoundary';
 import { ViewToggle } from '../components/ViewToggle';
-import { FilterPanel, DatePicker, Select } from '../components/ui';
+import { FilterDropdown, RefreshButton, DatePicker, Select } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { useEnterSubmit } from '../hooks/useEnterSubmit';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -47,10 +48,9 @@ export function CashPage() {
   const [tab, setTab] = useState<'movements' | 'closings'>(canCreateMovement ? 'movements' : 'closings');
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [closings, setClosings] = useState<CashClosing[]>([]);
-  const [date, setDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
+  const [date, setDate] = useState(() => getBusinessDayDate());
+
+  const todayStr = getBusinessDayDate();
 
   // Form states
   const [showMovForm, setShowMovForm] = useState(false);
@@ -182,6 +182,27 @@ export function CashPage() {
         icon={<CurrencyDollar size={24} weight="duotone" />}
         title="Caja"
         description="Controla el efectivo del negocio: registra entradas (fondos, depósitos) y salidas (pagos, retiros). Realiza cierres de caja al final del turno comparando lo esperado con lo real para detectar diferencias."
+        actions={
+          <>
+            <FilterDropdown
+              activeCount={cActiveCount + (date !== todayStr ? 1 : 0)}
+              onClear={() => { clearCFilters(); setDate(todayStr); }}
+              chips={cFilters.type ? [{ key: 't', label: cFilters.type === 'CASH_IN' ? 'Entradas' : 'Salidas', onRemove: () => setCFilter('type', '') }] : []}
+              storageKey="cash"
+            >
+              <DatePicker label="Fecha" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Select label="Tipo" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona tipo" options={[
+                { value: '', label: 'Todos' }, { value: 'CASH_IN', label: 'Entradas' }, { value: 'CASH_OUT', label: 'Salidas' },
+              ]} value={cFilters.type} onChange={(e) => setCFilter('type', e.target.value)} />
+              <Select label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
+                { value: 'recent', label: 'Más reciente' },
+                { value: 'oldest', label: 'Más antiguo' },
+                { value: 'amountDesc', label: 'Monto mayor a menor' },
+                { value: 'amountAsc', label: 'Monto menor a mayor' },
+              ]} value={cFilters.sort} onChange={(e) => setCFilter('sort', e.target.value)} />
+            </FilterDropdown>
+          </>
+        }
       />
 
       <StatsCards cards={(() => {
@@ -194,25 +215,6 @@ export function CashPage() {
           { label: 'Balance', value: formatCurrency(inTotal - outTotal), icon: <CurrencyDollar size={20} weight="duotone" />, color: inTotal - outTotal >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500' },
         ];
       })()} />
-
-      <div className="mb-4">
-        <FilterPanel storageKey="cash"
-          activeCount={cActiveCount + (date !== (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })() ? 1 : 0)}
-          onClear={() => { clearCFilters(); const d = new Date(); setDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }}
-          chips={cFilters.type ? [{ key: 't', label: cFilters.type === 'CASH_IN' ? 'Entradas' : 'Salidas', onRemove: () => setCFilter('type', '') }] : []}
-        >
-          <DatePicker label="Fecha" value={date} onChange={(e) => setDate(e.target.value)} />
-          <Select label="Tipo" icon={<Funnel size={14} weight="duotone" />} placeholder="Selecciona tipo" options={[
-            { value: '', label: 'Todos' }, { value: 'CASH_IN', label: 'Entradas' }, { value: 'CASH_OUT', label: 'Salidas' },
-          ]} value={cFilters.type} onChange={(e) => setCFilter('type', e.target.value)} />
-          <Select label="Ordenar por" icon={<SortAscending size={14} weight="duotone" />} options={[
-            { value: 'recent', label: 'Más reciente' },
-            { value: 'oldest', label: 'Más antiguo' },
-            { value: 'amountDesc', label: 'Monto mayor a menor' },
-            { value: 'amountAsc', label: 'Monto menor a mayor' },
-          ]} value={cFilters.sort} onChange={(e) => setCFilter('sort', e.target.value)} />
-        </FilterPanel>
-      </div>
 
       {/* Tabs */}
       <div id="cash-tabs" className="flex gap-2 mb-4">
@@ -262,6 +264,8 @@ export function CashPage() {
                 if (s === 'amountAsc') return parseFloat(a.amount) - parseFloat(b.amount);
                 return 0;
               })}
+              totalCount={movements.length}
+              refreshSlot={<RefreshButton onClick={() => { loadMovements(); if (canCreateClosing) loadClosings(); }} loading={loading} />}
               keyField="id"
               searchFilter={(m, q) => m.reason.toLowerCase().includes(q) || `${m.user.firstName} ${m.user.lastName}`.toLowerCase().includes(q)}
               searchPlaceholder="Buscar por motivo o usuario..."

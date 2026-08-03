@@ -168,7 +168,7 @@ export function Combobox({
   const labelOfValue = (v: string) => options.find((o) => o.value === v)?.label || v;
 
   return (
-    <div className={cn('w-full', wrapperClassName)}>
+    <div className={cn('w-full', wrapperClassName)} data-combobox-container>
       {label && <label className={LABEL_BASE}>{label}</label>}
       <div className="relative">
         <button
@@ -200,7 +200,7 @@ export function Combobox({
             )}
           </span>
           {clearable && selectedValues.length > 0 && (
-            <span onClick={clearAll} className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer">
+            <span onClick={clearAll} data-combobox-clear className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer">
               <X size={14} />
             </span>
           )}
@@ -210,6 +210,7 @@ export function Combobox({
         {open && pos && createPortal(
           <div
             ref={dropdownRef}
+            data-combobox-dropdown
             style={{
               position: 'fixed',
               top: pos.openUp ? undefined : pos.top,

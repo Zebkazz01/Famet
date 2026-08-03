@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import client from '../api/client';
 import { formatDateTime } from '../utils/formatters';
 import toast from 'react-hot-toast';
@@ -10,7 +10,7 @@ import { ViewToggle } from '../components/ViewToggle';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Portal } from '../components/Portal';
-import { FilterPanel, Combobox } from '../components/ui';
+import { FilterDropdown, RefreshButton, Combobox } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { useEnterSubmit } from '../hooks/useEnterSubmit';
 import { useModalEscape } from '../contexts/ModalStackContext';
@@ -143,13 +143,46 @@ export function SuppliersPage() {
         title="Proveedores"
         description="Administra la red de proveedores del negocio con contacto, dirección, NIT/identificación y notas. Vincúlalos a productos y movimientos de inventario para trazabilidad de compras."
         actions={
-          <button
-            id="suppliers-new-btn"
-            onClick={() => { setShowForm(true); setEditId(null); setForm(emptyForm); }}
-            className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-xs md:text-sm"
-          >
-            <Plus size={16} weight="bold" /> Nuevo Proveedor
-          </button>
+          <>
+            <FilterDropdown activeCount={activeCount} onClear={clear} chips={[
+              ...(filters.city ? [{ key: 'c', label: filters.city, onRemove: () => setFilter('city', '') }] : []),
+              ...(filters.active ? [{ key: 'a', label: filters.active === 'yes' ? 'Activos' : 'Inactivos', onRemove: () => setFilter('active', '') }] : []),
+            ]} storageKey="suppliers">
+              <Combobox label="Ciudad" icon={<MapPin size={14} weight="duotone" />} placeholder="Selecciona ciudad" options={cityOptions} value={filters.city} onChange={(v) => setFilter('city', (v as string) || '')} />
+              <Combobox
+                label="Estado"
+                icon={<Funnel size={14} weight="duotone" />}
+                placeholder="Selecciona estado"
+                options={[
+                  { value: '', label: 'Todos' },
+                  { value: 'yes', label: 'Activos' },
+                  { value: 'no', label: 'Inactivos' },
+                ]}
+                value={filters.active}
+                onChange={(v) => setFilter('active', (v as string) || '')}
+              />
+              <Combobox
+                label="Ordenar por"
+                icon={<SortAscending size={14} weight="duotone" />}
+                options={[
+                  { value: 'recent', label: 'Más reciente' },
+                  { value: 'oldest', label: 'Más antiguo' },
+                  { value: 'az', label: 'Nombre A-Z' },
+                  { value: 'za', label: 'Nombre Z-A' },
+                ]}
+                value={filters.sort}
+                onChange={(v) => setFilter('sort', (v as string) || 'recent')}
+                clearable={false}
+              />
+            </FilterDropdown>
+            <button
+              id="suppliers-new-btn"
+              onClick={() => { setShowForm(true); setEditId(null); setForm(emptyForm); }}
+              className="inline-flex items-center gap-1.5 bg-red-500 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-xs md:text-sm"
+            >
+              <Plus size={16} weight="bold" /> Nuevo Proveedor
+            </button>
+          </>
         }
       />
 
@@ -160,46 +193,10 @@ export function SuppliersPage() {
         { label: 'Con productos', value: suppliers.filter(s => s._count.products > 0).length, icon: <Package size={20} weight="duotone" />, color: 'bg-purple-100 text-purple-600' },
       ]} />
 
-      <div className="mb-4">
-        <FilterPanel storageKey="suppliers" toggleOnEvent="fameat:toggle-filters"
-          activeCount={activeCount}
-          onClear={clear}
-          chips={[
-            ...(filters.city ? [{ key: 'c', label: filters.city, onRemove: () => setFilter('city', '') }] : []),
-            ...(filters.active ? [{ key: 'a', label: filters.active === 'yes' ? 'Activos' : 'Inactivos', onRemove: () => setFilter('active', '') }] : []),
-          ]}
-        >
-          <Combobox label="Ciudad" icon={<MapPin size={14} weight="duotone" />} placeholder="Selecciona ciudad" options={cityOptions} value={filters.city} onChange={(v) => setFilter('city', (v as string) || '')} />
-          <Combobox
-            label="Estado"
-            icon={<Funnel size={14} weight="duotone" />}
-            placeholder="Selecciona estado"
-            options={[
-              { value: '', label: 'Todos' },
-              { value: 'yes', label: 'Activos' },
-              { value: 'no', label: 'Inactivos' },
-            ]}
-            value={filters.active}
-            onChange={(v) => setFilter('active', (v as string) || '')}
-          />
-          <Combobox
-            label="Ordenar por"
-            icon={<SortAscending size={14} weight="duotone" />}
-            options={[
-              { value: 'recent', label: 'Más reciente' },
-              { value: 'oldest', label: 'Más antiguo' },
-              { value: 'az', label: 'Nombre A-Z' },
-              { value: 'za', label: 'Nombre Z-A' },
-            ]}
-            value={filters.sort}
-            onChange={(v) => setFilter('sort', (v as string) || 'recent')}
-            clearable={false}
-          />
-        </FilterPanel>
-      </div>
-
       <div id="suppliers-list" className="bg-white rounded-xl shadow p-4">
         <ViewToggle storageKey="suppliers" searchInputProps={{ 'data-search-input': '' }}
+          refreshSlot={<RefreshButton onClick={() => load()} loading={loading} />}
+          totalCount={suppliers.length}
           data={filteredSuppliers}
           searchFilter={(s, q) => s.name.toLowerCase().includes(q) || (s.nit || '').includes(q) || (s.city || '').toLowerCase().includes(q)}
           searchPlaceholder="Buscar proveedor..."

@@ -3,9 +3,10 @@ import { evaluate, type CartItem } from '../discountEngine';
 import { DiscountType, type ProductDiscountRule } from '@prisma/client';
 
 function makeRule(overrides: Partial<ProductDiscountRule> & { productId: number }): ProductDiscountRule {
+  const { productId, ...rest } = overrides;
   return {
     id: 1,
-    productId: overrides.productId,
+    productId,
     type: DiscountType.PERCENTAGE,
     config: {},
     priority: 1,
@@ -14,7 +15,7 @@ function makeRule(overrides: Partial<ProductDiscountRule> & { productId: number 
     validTo: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    ...overrides,
+    ...rest,
   } as ProductDiscountRule;
 }
 

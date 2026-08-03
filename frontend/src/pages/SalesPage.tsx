@@ -3,8 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import client from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, formatDateTime, formatQty } from '../utils/formatters';
+import { getBusinessDayDate } from '../utils/businessDay';
 import toast from 'react-hot-toast';
-import { ChartBar, Receipt, Eye, X, ShoppingBag, CurrencyDollar, CreditCard, Money, Funnel, SortAscending, Wallet, Trash } from '@phosphor-icons/react';
+import { ChartBar, Receipt, Eye, X, ShoppingBag, CurrencyDollar, CreditCard, Money, Funnel, SortAscending, Wallet, Trash, Cow, Heart } from '@phosphor-icons/react';
 import { Portal } from '../components/Portal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { StatsCards } from '../components/StatsCards';
@@ -12,7 +13,7 @@ import { PageSkeleton } from '../components/PageSkeleton';
 import { PageHeader } from '../components/layout/PageHeader';
 import { ErrorView } from '../components/ErrorBoundary';
 import { ViewToggle } from '../components/ViewToggle';
-import { FilterPanel, DateRangePicker, Combobox } from '../components/ui';
+import { FilterDropdown, RefreshButton, DateRangePicker, Combobox } from '../components/ui';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { useModalEscape } from '../contexts/ModalStackContext';
 
@@ -30,6 +31,7 @@ interface Sale {
   user: { firstName: string; lastName: string };
   _count: { items: number };
   productNames: string;
+  animalTypes?: string[];
 }
 
 interface SaleDetail {
@@ -85,11 +87,12 @@ export function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
   const requestId = useRef(0);
-  const { filters, setFilter, clear: _clear, activeCount } = useTableFilters<{ range: { from?: string; to?: string }; paymentMethod: string; corrected: string; sort: string }>({
+  const { filters, setFilter, clear: _clear, activeCount } = useTableFilters<{ range: { from?: string; to?: string }; paymentMethod: string; corrected: string; sort: string; animalType: string }>({
     range: { from: '', to: '' },
     paymentMethod: '',
     corrected: '',
     sort: 'recent',
+    animalType: '',
   });
   // Vacío = todas las ventas (sin filtro de fecha)
   const dateFrom = filters.range.from || '';
@@ -104,15 +107,15 @@ export function SalesPage() {
 
   const showSummary = hasRole('ADMIN', 'SUPERVISOR');
 
-  const load = useCallback((from?: string, to?: string) => {
+  const load = useCallback((from?: string, to?: string, animalType?: string) => {
     const id = ++requestId.current;
     setLoading(true);
     setLoadError(null);
     Promise.all([
-      client.get('/sales', { params: { ...(from ? { from } : {}), ...(to ? { to } : {}), limit: 500 } }).then((r) => {
+      client.get('/sales', { params: { ...(from ? { from } : {}), ...(to ? { to } : {}), ...(animalType ? { animalType } : {}), limit: 500 } }).then((r) => {
         if (id === requestId.current) setSales(r.data);
       }),
-      showSummary ? client.get(`/sales/summary?date=${from || new Date().toISOString().split('T')[0]}`).then((r) => {
+      showSummary ? client.get(`/sales/summary?date=${from || getBusinessDayDate()}`).then((r) => {
         if (id === requestId.current) setSummary(r.data);
       }).catch(() => {}) : Promise.resolve(),
     ]).catch((err) => {
@@ -122,7 +125,7 @@ export function SalesPage() {
     });
   }, [showSummary]);
 
-  useEffect(() => { load(dateFrom, dateTo); }, [dateFrom, dateTo, load]);
+  useEffect(() => { load(dateFrom, dateTo, filters.animalType); }, [dateFrom, dateTo, filters.animalType, load]);
 
   const viewDetail = async (id: number) => {
     const { data } = await client.get(`/sales/${id}`);
@@ -213,85 +216,112 @@ export function SalesPage() {
     return { totalFiado, topDebtor: topDebtor || null };
   }, [sales]);
 
+  const meatStats = useMemo(() => {
+    const resSales = sales.filter(s => s.animalTypes?.includes('RES'));
+    const cerdoSales = sales.filter(s => s.animalTypes?.includes('CERDO'));
+    const totalRes = resSales.reduce((sum, s) => sum + parseFloat(s.total), 0);
+    const totalCerdo = cerdoSales.reduce((sum, s) => sum + parseFloat(s.total), 0);
+    return { totalRes, totalCerdo, resCount: resSales.length, cerdoCount: cerdoSales.length };
+  }, [sales]);
+
   if (loading) return <PageSkeleton type="table" />;
   if (loadError) return <ErrorView error={loadError} onRetry={() => { setLoadError(null); setLoading(true); }} />;
+
+  const salesFilters = (
+    <>
+      <DateRangePicker label="Rango de fechas" value={filters.range} onChange={(v) => setFilter('range', v)} />
+      <Combobox
+        label="Tipo de carne"
+        icon={<Cow size={14} weight="duotone" />}
+        placeholder="Selecciona tipo"
+        options={[
+          { value: '', label: 'Todos' },
+          { value: 'RES', label: 'Res' },
+          { value: 'CERDO', label: 'Cerdo' },
+        ]}
+        value={filters.animalType}
+        onChange={(v) => setFilter('animalType', (v as string) || '')}
+      />
+      <Combobox
+        label="Método de pago"
+        icon={<Wallet size={14} weight="duotone" />}
+        placeholder="Selecciona método"
+        options={[
+          { value: '', label: 'Todos' },
+          { value: 'CASH', label: 'Efectivo' },
+          { value: 'CARD', label: 'Tarjeta' },
+          { value: 'TRANSFER', label: 'Transferencia' },
+        ]}
+        value={filters.paymentMethod}
+        onChange={(v) => setFilter('paymentMethod', (v as string) || '')}
+      />
+      <Combobox
+        label="Estado"
+        icon={<Funnel size={14} weight="duotone" />}
+        placeholder="Selecciona estado"
+        options={[
+          { value: '', label: 'Todas' },
+          { value: 'yes', label: 'Corregidas' },
+          { value: 'no', label: 'Sin corregir' },
+        ]}
+        value={filters.corrected}
+        onChange={(v) => setFilter('corrected', (v as string) || '')}
+      />
+      <Combobox
+        label="Ordenar por"
+        icon={<SortAscending size={14} weight="duotone" />}
+        options={[
+          { value: 'recent', label: 'Más reciente' },
+          { value: 'oldest', label: 'Más antiguo' },
+          { value: 'totalDesc', label: 'Monto mayor a menor' },
+          { value: 'totalAsc', label: 'Monto menor a mayor' },
+        ]}
+        value={filters.sort}
+        onChange={(v) => setFilter('sort', (v as string) || 'recent')}
+        clearable={false}
+      />
+    </>
+  );
+
+  const salesChips = [
+    ...(filters.range.from || filters.range.to ? [{ key: 'date', label: `${filters.range.from || '...'} → ${filters.range.to || '...'}`, onRemove: () => setFilter('range', {}) }] : []),
+    ...(filters.animalType ? [{ key: 'at', label: filters.animalType === 'RES' ? 'Res' : 'Cerdo', onRemove: () => setFilter('animalType', '') }] : []),
+    ...(filters.paymentMethod ? [{ key: 'pm', label: filters.paymentMethod, onRemove: () => setFilter('paymentMethod', '') }] : []),
+    ...(filters.corrected ? [{ key: 'c', label: filters.corrected === 'yes' ? 'Corregidas' : 'Sin corregir', onRemove: () => setFilter('corrected', '') }] : []),
+  ];
 
   return (
     <div className="p-3 md:p-6">
       <PageHeader
         icon={<ChartBar size={24} weight="duotone" />}
         title="Historial de Ventas"
-        description="Consulta todas las ventas realizadas con filtros por fecha, método de pago y usuario. Abre el detalle para ver productos, cantidades y total, descarga el ticket o marca como corregida con motivo."
+        description="Consulta todas las ventas realizadas con filtros por fecha, método de pago y usuario."
+        actions={
+          <>
+            <FilterDropdown
+              activeCount={activeCount}
+              onClear={() => { setFilter('range', {}); setFilter('paymentMethod', ''); setFilter('corrected', ''); setFilter('sort', 'recent'); setFilter('animalType', ''); }}
+              chips={salesChips}
+              storageKey="sales"
+            >
+              {salesFilters}
+            </FilterDropdown>
+          </>
+        }
       />
 
       <StatsCards cards={[
         { label: 'Ventas', value: sales.length, icon: <ShoppingBag size={20} weight="duotone" />, color: 'bg-blue-100 text-blue-600' },
         { label: 'Ingresos', value: formatCurrency(sales.reduce((s, v) => s + parseFloat(v.total), 0)), icon: <CurrencyDollar size={20} weight="duotone" />, color: 'bg-green-100 text-green-600' },
-        { label: 'Efectivo', value: formatCurrency(sales.filter(v => v.paymentMethod === 'CASH').reduce((s, v) => s + parseFloat(v.total), 0)), icon: <Money size={20} weight="duotone" />, color: 'bg-amber-100 text-amber-600', sub: `Tarjeta/Transfer: ${formatCurrency(sales.filter(v => v.paymentMethod !== 'CASH').reduce((s, v) => s + parseFloat(v.total), 0))}` },
-        { label: 'Fiado', value: fiadoStats.totalFiado > 0 ? formatCurrency(fiadoStats.totalFiado) : 'Sin deudas', icon: <Wallet size={20} weight="duotone" />, color: fiadoStats.totalFiado > 0 ? 'bg-rose-100 text-rose-600' : 'bg-green-100 text-green-600', sub: fiadoStats.totalFiado > 0 && fiadoStats.topDebtor ? `Más debe: ${fiadoStats.topDebtor.name} (${formatCurrency(fiadoStats.topDebtor.total)})` : undefined },
+        { label: 'Res', value: formatCurrency(meatStats.totalRes), icon: <Heart size={20} weight="duotone" />, color: 'bg-red-100 text-red-600', sub: `${meatStats.resCount} ventas` },
+        { label: 'Cerdo', value: formatCurrency(meatStats.totalCerdo), icon: <Cow size={20} weight="duotone" />, color: 'bg-amber-100 text-amber-600', sub: `${meatStats.cerdoCount} ventas` },
       ]} />
-
-      {/* Filtros */}
-      <div id="sales-date-filters" className="mb-4">
-        <FilterPanel storageKey="sales" toggleOnEvent="fameat:toggle-filters"
-          activeCount={activeCount}
-          onClear={() => {
-            setFilter('range', {});
-            setFilter('paymentMethod', '');
-            setFilter('corrected', '');
-            setFilter('sort', 'recent');
-          }}
-          chips={[
-            ...(filters.range.from || filters.range.to ? [{ key: 'date', label: `${filters.range.from || '...'} → ${filters.range.to || '...'}`, onRemove: () => setFilter('range', {}) }] : []),
-            ...(filters.paymentMethod ? [{ key: 'pm', label: filters.paymentMethod, onRemove: () => setFilter('paymentMethod', '') }] : []),
-            ...(filters.corrected ? [{ key: 'c', label: filters.corrected === 'yes' ? 'Corregidas' : 'Sin corregir', onRemove: () => setFilter('corrected', '') }] : []),
-          ]}
-        >
-          <DateRangePicker label="Rango de fechas" value={filters.range} onChange={(v) => setFilter('range', v)} />
-          <Combobox
-            label="Método de pago"
-            icon={<Wallet size={14} weight="duotone" />}
-            placeholder="Selecciona método"
-            options={[
-              { value: '', label: 'Todos' },
-              { value: 'CASH', label: 'Efectivo' },
-              { value: 'CARD', label: 'Tarjeta' },
-              { value: 'TRANSFER', label: 'Transferencia' },
-            ]}
-            value={filters.paymentMethod}
-            onChange={(v) => setFilter('paymentMethod', (v as string) || '')}
-          />
-          <Combobox
-            label="Estado"
-            icon={<Funnel size={14} weight="duotone" />}
-            placeholder="Selecciona estado"
-            options={[
-              { value: '', label: 'Todas' },
-              { value: 'yes', label: 'Corregidas' },
-              { value: 'no', label: 'Sin corregir' },
-            ]}
-            value={filters.corrected}
-            onChange={(v) => setFilter('corrected', (v as string) || '')}
-          />
-          <Combobox
-            label="Ordenar por"
-            icon={<SortAscending size={14} weight="duotone" />}
-            options={[
-              { value: 'recent', label: 'Más reciente' },
-              { value: 'oldest', label: 'Más antiguo' },
-              { value: 'totalDesc', label: 'Monto mayor a menor' },
-              { value: 'totalAsc', label: 'Monto menor a mayor' },
-            ]}
-            value={filters.sort}
-            onChange={(v) => setFilter('sort', (v as string) || 'recent')}
-            clearable={false}
-          />
-        </FilterPanel>
-      </div>
 
       {/* Lista de ventas */}
       <div id="sales-list" className="bg-white rounded-xl shadow p-4">
         <ViewToggle storageKey="sales" searchInputProps={{ 'data-search-input': '' }}
+          refreshSlot={<RefreshButton onClick={() => load(dateFrom, dateTo)} loading={loading} />}
+          totalCount={sales.length}
           data={sales.filter((s) => {
             if (filters.paymentMethod && s.paymentMethod !== filters.paymentMethod) return false;
             if (filters.corrected === 'yes' && !s.corrected) return false;

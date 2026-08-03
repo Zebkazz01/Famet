@@ -1,4 +1,5 @@
 import { prisma } from "../../config/database";
+import { parseBusinessDateParam, getBusinessDayDate, groupByBusinessDay } from "../../utils/businessDay";
 
 export interface FinancialRange {
   from: Date;
@@ -163,14 +164,14 @@ export async function build(range: FinancialRange, opts: { includeDaily?: boolea
   if (opts.includeDaily) {
     const dayMap = new Map<string, { date: string; sales: number; revenue: number; expenses: number; net: number }>();
     for (const s of sales) {
-      const d = s.createdAt.toISOString().slice(0, 10);
+      const d = groupByBusinessDay(s.createdAt);
       const agg = dayMap.get(d) || { date: d, sales: 0, revenue: 0, expenses: 0, net: 0 };
       agg.sales += 1;
       agg.revenue += Number(s.total);
       dayMap.set(d, agg);
     }
     for (const e of expenses) {
-      const d = e.date.toISOString().slice(0, 10);
+      const d = groupByBusinessDay(e.date);
       const agg = dayMap.get(d) || { date: d, sales: 0, revenue: 0, expenses: 0, net: 0 };
       agg.expenses += Number(e.amount);
       dayMap.set(d, agg);
@@ -185,18 +186,13 @@ export async function build(range: FinancialRange, opts: { includeDaily?: boolea
 }
 
 function parseDateParam(value: string, endOfDay: boolean): Date {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [y, m, d] = value.split("-").map(Number);
-    if (endOfDay) return new Date(y, m - 1, d, 23, 59, 59, 999);
-    return new Date(y, m - 1, d);
-  }
-  return new Date(value);
+  return parseBusinessDateParam(value, endOfDay);
 }
 
 export function parseRange(from?: string, to?: string): FinancialRange {
-  const today = new Date();
-  const f = from ? parseDateParam(from, false) : new Date(today.getFullYear(), today.getMonth(), 1);
-  const t = to ? parseDateParam(to, true) : today;
+  const today = getBusinessDayDate();
+  const f = from ? parseDateParam(from, false) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const t = to ? parseDateParam(to, true) : parseDateParam(today, true);
   return { from: f, to: t };
 }
 

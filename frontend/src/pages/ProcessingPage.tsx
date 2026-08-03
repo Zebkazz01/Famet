@@ -5,12 +5,15 @@ import {
   ArrowLeft, Plus, X, CheckCircle, ChartPieSlice,
   SealCheck, Package, CurrencyDollar, Scales, ClipboardText,
   MagnifyingGlass, TrendUp, WarningCircle, ArrowsLeftRight, Trash,
+  PencilSimple, FloppyDisk, ArrowCounterClockwise, Funnel,
 } from '@phosphor-icons/react';
 import * as api from '../api/processing';
 import type { ProcessingBatch, AnalysisResult, ProcessingOutputItem, DashboardSummary } from '../api/processing';
 import client from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
+import { Combobox } from '../components/ui';
+import { FilterPanel } from '../components/FilterSection';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { StatsCards, type StatCard } from '../components/StatsCards';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -123,6 +126,19 @@ export function ProcessingPage() {
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Global Ctrl+Shift+F
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        setFiltersOpen((prev) => !prev);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const [step, setStep] = useState(1);
   const [animalType, setAnimalType] = useState('RES');
@@ -137,6 +153,15 @@ export function ProcessingPage() {
   const [cuts, setCuts] = useState<CutEntry[]>([]);
   const [cutProductSearch, setCutProductSearch] = useState<Record<number, string>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  const [editBatchId, setEditBatchId] = useState<number | null>(null);
+  const [editAnimalType, setEditAnimalType] = useState('');
+  const [editInputWeightKg, setEditInputWeightKg] = useState('');
+  const [editTotalCost, setEditTotalCost] = useState('');
+  const [editWasteWeightKg, setEditWasteWeightKg] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editOutputs, setEditOutputs] = useState<ProcessingOutputItem[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     if (view === 'list') {
@@ -257,6 +282,67 @@ export function ProcessingPage() {
     }
   }, [navigate]);
 
+  const handleRevert = useCallback(async (batchId: number) => {
+    if (!confirm('¿Revertir este proceso? Se devolverán los movimientos de inventario y volverá a borrador.')) return;
+    try {
+      await api.revert(batchId);
+      toast.success('Proceso revertido a borrador');
+      const updated = await api.list({ status: statusFilter || undefined });
+      setBatches(updated);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Error al revertir');
+    }
+  }, [statusFilter]);
+
+  const handleEdit = useCallback(async (batchId: number) => {
+    try {
+      const batch = await api.getOne(batchId);
+      if (batch.status === 'COMPLETED') {
+        toast.error('Para editar, primero revierte el proceso a borrador');
+        return;
+      }
+      setEditBatchId(batch.id);
+      setEditAnimalType(batch.animalType);
+      setEditInputWeightKg(String(batch.inputWeightKg));
+      setEditTotalCost(String(batch.totalCost));
+      setEditWasteWeightKg(batch.wasteWeightKg ? String(batch.wasteWeightKg) : '');
+      setEditNotes(batch.notes || '');
+      setEditOutputs(
+        batch.outputs.map((o) => ({
+          productId: o.productId,
+          weightKg: o.weightKg,
+          costPerKg: o.costPerKg,
+          salePricePerKg: o.salePricePerKg,
+        }))
+      );
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Error al cargar el proceso');
+    }
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (editBatchId === null) return;
+    setSavingEdit(true);
+    try {
+      await api.update(editBatchId, {
+        animalType: editAnimalType,
+        inputWeightKg: parseFloat(editInputWeightKg) || 0,
+        totalCost: parseFloat(editTotalCost) || 0,
+        wasteWeightKg: parseFloat(editWasteWeightKg) || 0,
+        notes: editNotes || null,
+        outputs: editOutputs,
+      });
+      toast.success('Proceso actualizado');
+      setEditBatchId(null);
+      const updated = await api.list({ status: statusFilter || undefined });
+      setBatches(updated);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Error al actualizar');
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [editBatchId, editAnimalType, editInputWeightKg, editTotalCost, editWasteWeightKg, editNotes, editOutputs, statusFilter]);
+
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(productSearch.toLowerCase())
   );
@@ -312,10 +398,12 @@ export function ProcessingPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Tipo de animal</label>
-                      <select value={animalType} onChange={(e) => setAnimalType(e.target.value)}
-                        className="w-full h-10 px-3 text-sm border border-gray-200 dark:border-gray-700 dark:bg-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent">
-                        {ANIMALS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-                      </select>
+                      <Combobox
+                        placeholder="Seleccionar animal..."
+                        options={ANIMALS.map((a) => ({ value: a.value, label: a.label }))}
+                        value={animalType}
+                        onChange={(v) => setAnimalType((Array.isArray(v) ? v[0] : v) || 'RES')}
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Producto de entrada</label>
@@ -700,6 +788,23 @@ export function ProcessingPage() {
         description="Registra lotes de desposte de animales, divide en cortes, y analiza la recuperación de inversión vs ventas."
         actions={
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFiltersOpen((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium transition-colors border ${
+                filtersOpen || search || statusFilter
+                  ? 'bg-red-50 border-red-300 text-red-600 dark:bg-red-900/20 dark:border-red-700 dark:text-red-400'
+                  : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
+              }`}
+              title="Filtros (Ctrl+Shift+F)"
+            >
+              <Funnel size={14} weight="duotone" />
+              <span className="hidden sm:inline">Filtros</span>
+              {(search || statusFilter) && (
+                <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold bg-red-500 text-white rounded-full">
+                  {(search ? 1 : 0) + (statusFilter ? 1 : 0)}
+                </span>
+              )}
+            </button>
             <button onClick={toggleUnit}
               className="flex items-center gap-1 px-2.5 py-2 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
@@ -714,7 +819,7 @@ export function ProcessingPage() {
       {statsCards.length > 0 && <StatsCards cards={statsCards} />}
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <FilterPanel open={filtersOpen}>
         <div className="relative flex-1 max-w-xs">
           <MagnifyingGlass size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
@@ -727,12 +832,14 @@ export function ProcessingPage() {
             </button>
           )}
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-          className="h-9 px-3 text-sm border border-gray-200 dark:border-gray-700 dark:bg-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent">
-          <option value="">Todos los estados</option>
-          {statuses.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-        </select>
-      </div>
+        <Combobox
+          placeholder="Todos los estados"
+          options={statuses.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
+          value={statusFilter}
+          onChange={(v) => setStatusFilter((Array.isArray(v) ? v[0] : v) || '')}
+          clearable
+        />
+      </FilterPanel>
 
       {/* Table */}
       {loading ? (
@@ -779,16 +886,26 @@ export function ProcessingPage() {
                       <td className="px-4 py-3 text-right">
                         {batch.status === 'DRAFT' && (
                           <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
-                            <Button size="sm" onClick={() => handleComplete(batch.id)}><CheckCircle size={14} weight="bold" /></Button>
-                            <Button size="sm" variant="danger" onClick={() => handleCancel(batch.id)}><X size={14} weight="bold" /></Button>
+                            <Button size="sm" onClick={() => handleEdit(batch.id)} title="Editar"><PencilSimple size={14} weight="bold" /></Button>
+                            <Button size="sm" onClick={() => handleComplete(batch.id)} title="Finalizar"><CheckCircle size={14} weight="bold" /></Button>
+                            <Button size="sm" variant="danger" onClick={() => handleCancel(batch.id)} title="Cancelar"><X size={14} weight="bold" /></Button>
                             {hasRole('ADMIN', 'SUPERVISOR') && (
-                              <Button size="sm" variant="danger" onClick={() => setConfirmDeleteId(batch.id)}><Trash size={14} weight="bold" /></Button>
+                              <Button size="sm" variant="danger" onClick={() => setConfirmDeleteId(batch.id)} title="Eliminar"><Trash size={14} weight="bold" /></Button>
+                            )}
+                          </div>
+                        )}
+                        {batch.status === 'COMPLETED' && (
+                          <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+                            <Button size="sm" onClick={() => navigate(`/processing/${batch.id}`)} title="Ver detalles"><ClipboardText size={14} weight="bold" /></Button>
+                            <Button size="sm" onClick={() => handleRevert(batch.id)} title="Revertir a borrador"><ArrowCounterClockwise size={14} weight="bold" /></Button>
+                            {hasRole('ADMIN', 'SUPERVISOR') && (
+                              <Button size="sm" variant="danger" onClick={() => setConfirmDeleteId(batch.id)} title="Eliminar"><Trash size={14} weight="bold" /></Button>
                             )}
                           </div>
                         )}
                         {batch.status === 'CANCELLED' && hasRole('ADMIN', 'SUPERVISOR') && (
                           <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
-                            <Button size="sm" variant="danger" onClick={() => setConfirmDeleteId(batch.id)}><Trash size={14} weight="bold" /></Button>
+                            <Button size="sm" variant="danger" onClick={() => setConfirmDeleteId(batch.id)} title="Eliminar"><Trash size={14} weight="bold" /></Button>
                           </div>
                         )}
                       </td>
@@ -822,6 +939,72 @@ export function ProcessingPage() {
         onConfirm={handleDelete}
         onCancel={() => setConfirmDeleteId(null)}
       />
+
+      {editBatchId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditBatchId(null)}>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Editar Proceso</h2>
+                <p className="text-xs text-gray-500">Modifica los datos del proceso</p>
+              </div>
+              <button onClick={() => setEditBatchId(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de animal</label>
+                  <Combobox
+                    placeholder="Seleccionar animal..."
+                    options={ANIMALS.map((a) => ({ value: a.value, label: a.label }))}
+                    value={editAnimalType}
+                    onChange={(v) => setEditAnimalType((Array.isArray(v) ? v[0] : v) || 'RES')}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Peso entrada ({unitLabel(unit)})</label>
+                  <input type="number" step="0.01" value={editInputWeightKg} onChange={(e) => setEditInputWeightKg(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Costo total ($)</label>
+                  <input type="number" step="0.01" value={editTotalCost} onChange={(e) => setEditTotalCost(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Peso merma ({unitLabel(unit)})</label>
+                  <input type="number" step="0.01" value={editWasteWeightKg} onChange={(e) => setEditWasteWeightKg(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Notas</label>
+                <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-2">Cortes ({editOutputs.length})</label>
+                <div className="space-y-2 max-h-40 overflow-auto">
+                  {editOutputs.map((o, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-xs">
+                      <span className="flex-1 text-gray-700 dark:text-gray-300">Producto #{o.productId}</span>
+                      <span className="text-gray-500">{toUnitFixed(o.weightKg, unit)} {unitLabel(unit)}</span>
+                      <span className="text-gray-500">${Number(o.costPerKg).toFixed(2)}/{unitLabel(unit)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
+              <Button variant="secondary" onClick={() => setEditBatchId(null)}>Cancelar</Button>
+              <Button onClick={handleSaveEdit} disabled={savingEdit}>
+                <FloppyDisk size={16} weight="bold" />
+                {savingEdit ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

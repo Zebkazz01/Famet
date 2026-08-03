@@ -6,7 +6,7 @@ import {
 import toast from 'react-hot-toast';
 import * as expensesApi from '../api/expenses';
 import type { Expense, ExpensePaymentMethod } from '../api/expenses';
-import { Card, Button, Badge, Input, Combobox, FilterPanel, DatePicker, Select, FileInput, SkeletonRow } from '../components/ui';
+import { Card, Button, Badge, Input, Combobox, FilterDropdown, RefreshButton, DatePicker, Select, FileInput, SkeletonRow } from '../components/ui';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useTableFilters } from '../hooks/useTableFilters';
 import { Portal } from '../components/Portal';
@@ -197,9 +197,50 @@ export function ExpensesPage() {
         title="Gastos"
         description="Registra egresos del negocio con categoría, proveedor opcional, descripción y comprobante adjunto (foto o PDF). Filtra por fecha y categoría para análisis. Los gastos impactan el resultado neto del período."
         actions={
-          <Button id="expenses-new-btn" size="md" variant="primary" iconLeft={<Plus size={16} weight="bold" />} onClick={startNew}>
-            Nuevo gasto
-          </Button>
+          <>
+            <FilterDropdown activeCount={activeCount} onClear={clear} chips={[
+              ...(filters.q ? [{ key: 'q', label: `"${filters.q}"`, onRemove: () => setFilter('q', '') }] : []),
+              ...(filters.category ? [{ key: 'category', label: filters.category, onRemove: () => setFilter('category', '') }] : []),
+              ...(filters.from || filters.to ? [{ key: 'date', label: `${filters.from || '...'} → ${filters.to || '...'}`, onRemove: () => { setFilter('from', ''); setFilter('to', ''); } }] : []),
+            ]} storageKey="expenses">
+              <Input
+                label="Buscar"
+                placeholder="Descripción o categoría..."
+                value={filters.q}
+                onChange={(e) => setFilter('q', e.target.value)}
+                prefix={<MagnifyingGlass size={14} />}
+                data-search-input=""
+              />
+              <Combobox
+                label="Categoría"
+                icon={<Folder size={14} weight="duotone" />}
+                placeholder="Selecciona categoría"
+                options={categoryOptions}
+                value={filters.category}
+                onChange={(v) => setFilter('category', (v as string) || '')}
+              />
+              <DatePicker label="Desde" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} />
+              <DatePicker label="Hasta" value={filters.to} onChange={(e) => setFilter('to', e.target.value)} />
+              <Combobox
+                label="Ordenar por"
+                icon={<SortAscending size={14} weight="duotone" />}
+                options={[
+                  { value: 'recent', label: 'Más reciente' },
+                  { value: 'oldest', label: 'Más antiguo' },
+                  { value: 'amountDesc', label: 'Monto mayor a menor' },
+                  { value: 'amountAsc', label: 'Monto menor a mayor' },
+                  { value: 'az', label: 'Descripción A-Z' },
+                  { value: 'za', label: 'Descripción Z-A' },
+                ]}
+                value={filters.sort}
+                onChange={(v) => setFilter('sort', (v as string) || 'recent')}
+                clearable={false}
+              />
+            </FilterDropdown>
+            <Button id="expenses-new-btn" size="md" variant="primary" iconLeft={<Plus size={16} weight="bold" />} onClick={startNew}>
+              Nuevo gasto
+            </Button>
+          </>
         }
       />
 
@@ -248,51 +289,6 @@ export function ExpensesPage() {
           </div>
         </Card>
       </div>
-
-      {/* Filtros */}
-      <FilterPanel storageKey="expenses" toggleOnEvent="fameat:toggle-filters"
-        activeCount={activeCount}
-        onClear={clear}
-        chips={[
-          ...(filters.q ? [{ key: 'q', label: `"${filters.q}"`, onRemove: () => setFilter('q', '') }] : []),
-          ...(filters.category ? [{ key: 'category', label: filters.category, onRemove: () => setFilter('category', '') }] : []),
-          ...(filters.from || filters.to ? [{ key: 'date', label: `${filters.from || '...'} → ${filters.to || '...'}`, onRemove: () => { setFilter('from', ''); setFilter('to', ''); } }] : []),
-        ]}
-      >
-        <Input
-          label="Buscar"
-          placeholder="Descripción o categoría..."
-          value={filters.q}
-          onChange={(e) => setFilter('q', e.target.value)}
-          prefix={<MagnifyingGlass size={14} />}
-          data-search-input=""
-        />
-        <Combobox
-          label="Categoría"
-          icon={<Folder size={14} weight="duotone" />}
-          placeholder="Selecciona categoría"
-          options={categoryOptions}
-          value={filters.category}
-          onChange={(v) => setFilter('category', (v as string) || '')}
-        />
-        <DatePicker label="Desde" value={filters.from} onChange={(e) => setFilter('from', e.target.value)} />
-        <DatePicker label="Hasta" value={filters.to} onChange={(e) => setFilter('to', e.target.value)} />
-        <Combobox
-          label="Ordenar por"
-          icon={<SortAscending size={14} weight="duotone" />}
-          options={[
-            { value: 'recent', label: 'Más reciente' },
-            { value: 'oldest', label: 'Más antiguo' },
-            { value: 'amountDesc', label: 'Monto mayor a menor' },
-            { value: 'amountAsc', label: 'Monto menor a mayor' },
-            { value: 'az', label: 'Descripción A-Z' },
-            { value: 'za', label: 'Descripción Z-A' },
-          ]}
-          value={filters.sort}
-          onChange={(v) => setFilter('sort', (v as string) || 'recent')}
-          clearable={false}
-        />
-      </FilterPanel>
 
       {/* Lista */}
       <Card id="expenses-list" padding="none">
@@ -378,6 +374,12 @@ export function ExpensesPage() {
           </table>
         </div>
       </Card>
+
+      {/* Toolbar inferior */}
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span>{sortedExpenses.length} registro{sortedExpenses.length !== 1 ? 's' : ''}{loading && ' (cargando…)'}</span>
+        <RefreshButton onClick={() => refresh()} loading={loading} />
+      </div>
 
       {/* Modal Form */}
       {showForm && (
