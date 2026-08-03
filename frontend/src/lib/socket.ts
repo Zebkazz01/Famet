@@ -24,11 +24,19 @@ export function getRootSocket(): Socket {
   }
   rootSocket = io('/', {
     transports: ['websocket', 'polling'],
-    reconnectionAttempts: Infinity,
+    reconnectionAttempts: 3,
     reconnectionDelay: 2000,
     timeout: 8000,
     auth: { token: currentToken() },
+    autoConnect: false,
   });
+  rootSocket.on('connect_error', () => {
+    console.warn('[Socket] Connection failed, retrying...');
+  });
+  rootSocket.on('disconnect', () => {
+    console.warn('[Socket] Disconnected');
+  });
+  rootSocket.connect();
   return rootSocket;
 }
 

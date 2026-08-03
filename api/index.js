@@ -30,10 +30,10 @@ const PRODUCTS=[
 ];
 const CATEGORIES=[{id:1,name:'Lácteos',color:'#10B981',active:true},{id:2,name:'Carnes',color:'#EF4444',active:true},{id:3,name:'Bebidas',color:'#3B82F6',active:true},{id:4,name:'Embutidos',color:'#F59E0B',active:true},{id:5,name:'Mariscos',color:'#06B6D4',active:true},{id:6,name:'Varios',color:'#8B5CF6',active:true}];
 const SALES=[
-{id:1001,total:'27500.00',paymentMethod:'CASH',createdAt:'2026-06-01T14:30:00.000Z',user:{firstName:'Carlos',lastName:'López'},items:[{product:{name:'Huevos AA'},quantity:'1.000',subtotal:'15000.00'},{product:{name:'Muslo de Pollo'},quantity:'1.310',subtotal:'12500.00'}]},
-{id:1002,total:'12000.00',paymentMethod:'CARD',createdAt:'2026-06-01T13:15:00.000Z',user:{firstName:'Carlos',lastName:'López'},items:[{product:{name:'Pechuga de Pollo'},quantity:'1.000',subtotal:'12000.00'}]},
-{id:1003,total:'45500.00',paymentMethod:'CASH',createdAt:'2026-06-01T11:45:00.000Z',user:{firstName:'María',lastName:'García'},items:[{product:{name:'Lomo de Res'},quantity:'1.000',subtotal:'28000.00'},{product:{name:'Cerveza Águila'},quantity:'5.000',subtotal:'17500.00'}]},
-{id:1004,total:'8500.00',paymentMethod:'TRANSFER',createdAt:'2026-06-01T10:20:00.000Z',user:{firstName:'Carlos',lastName:'López'},items:[{product:{name:'Cerveza Águila'},quantity:'1.000',subtotal:'3500.00'},{product:{name:'Gaseosa Coca-Cola 1.5L'},quantity:'1.000',subtotal:'5500.00'}]}
+{id:1001,total:'27500.00',paymentMethod:'CASH',createdAt:'2026-06-01T14:30:00.000Z',user:{firstName:'Carlos',lastName:'López'},_count:{items:2},items:[{product:{name:'Huevos AA'},quantity:'1.000',subtotal:'15000.00'},{product:{name:'Muslo de Pollo'},quantity:'1.310',subtotal:'12500.00'}]},
+{id:1002,total:'12000.00',paymentMethod:'CARD',createdAt:'2026-06-01T13:15:00.000Z',user:{firstName:'Carlos',lastName:'López'},_count:{items:1},items:[{product:{name:'Pechuga de Pollo'},quantity:'1.000',subtotal:'12000.00'}]},
+{id:1003,total:'45500.00',paymentMethod:'CASH',createdAt:'2026-06-01T11:45:00.000Z',user:{firstName:'María',lastName:'García'},_count:{items:2},items:[{product:{name:'Lomo de Res'},quantity:'1.000',subtotal:'28000.00'},{product:{name:'Cerveza Águila'},quantity:'5.000',subtotal:'17500.00'}]},
+{id:1004,total:'8500.00',paymentMethod:'TRANSFER',createdAt:'2026-06-01T10:20:00.000Z',user:{firstName:'Carlos',lastName:'López'},_count:{items:2},items:[{product:{name:'Cerveza Águila'},quantity:'1.000',subtotal:'3500.00'},{product:{name:'Gaseosa Coca-Cola 1.5L'},quantity:'1.000',subtotal:'5500.00'}]}
 ];
 const CUSTOMERS=[{id:1,name:'Juan Pérez',phone:'3101234567',document:'1234567890',currentDebt:'0.00',creditLimit:'500000.00',discountPercent:'5.00',active:true},{id:2,name:'María García',phone:'3159876543',document:'0987654321',currentDebt:'25000.00',creditLimit:'300000.00',discountPercent:null,active:true}];
 const SUPPLIERS=[{id:1,name:'Distribuidora Central',nit:'900123456',phone:'3101112233',email:'ventas@distcentral.com',active:true},{id:2,name:'Avícola del Norte',nit:'900789012',phone:'3154445566',contact:'pedidos@avinorte.com',active:true}];
@@ -109,6 +109,17 @@ loadHandler('purchase-orders', purchaseOrders);
 const discountRules = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,DELETE,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); if(req.method==='POST') return res.status(201).json({id:Date.now(),...req.body}); res.status(200).json({items:[],nextCursor:null}); }};
 loadHandler('discount-rules', discountRules);
 
+const manifestHandler = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.setHeader('Content-Type','application/json'); res.status(200).json({name:'FAMEAT POS',short_name:'FAMEAT',description:'Sistema de Punto de Venta',start_url:'/',display:'standalone',background_color:'#ffffff',theme_color:'#dc2626',icons:[]}); }};
+loadHandler('manifest.json', manifestHandler);
+
+const networkHandler = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({ip:'127.0.0.1',port:3000,hostname:'localhost'}); }};
+loadHandler('network', networkHandler);
+
+const processingHandler = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,DELETE,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); if(req.method==='POST') return res.status(201).json({id:Date.now(),...req.body}); res.status(200).json([]); }};
+loadHandler('processing', processingHandler);
+
+const processingSummaryHandler = { default: (req, res) => { res.setHeader('Access-Control-Allow-Origin','*'); res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS'); res.setHeader('Access-Control-Allow-Headers','Content-Type'); if(req.method==='OPTIONS') return res.status(200).end(); res.status(200).json({month:'2026-06',activeBatches:0,totalInvested:0,totalOutputWeight:0,totalRecoveredCost:0,totalRecoveredRevenue:0,recoveryPct:0,pendingRecovery:0}); }};
+loadHandler('processing/summary', processingSummaryHandler);
 
 const ROUTE_MAP = {
   'health': 'health',
@@ -142,6 +153,10 @@ const ROUTE_MAP = {
   'reports/inventory': 'reports-inventory',
   'purchase-orders': 'purchase-orders',
   'discount-rules': 'discount-rules',
+  'manifest.json': 'manifest.json',
+  'network': 'network',
+  'processing': 'processing',
+  'processing/summary': 'processing/summary',
 };
 
 module.exports = function handler(req, res) {

@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import { authenticate, authorize } from "../../middleware/auth";
+import { asyncHandler } from "../../middleware/asyncHandler";
 import { uploadsDir } from "../../utils/paths";
 import {
   getConfig,
@@ -26,13 +27,13 @@ const logoUpload = multer({
 });
 
 // Públicos
-router.get("/public", getPublicConfig);
-router.get("/version", getConfigVersion);
+router.get("/public", asyncHandler(getPublicConfig));
+router.get("/version", asyncHandler(getConfigVersion));
 
 // Auth requerida
-router.get("/", authenticate, getConfig);
-router.put("/", authenticate, authorize("ADMIN"), updateConfig);
-router.post("/logo", authenticate, authorize("ADMIN"), logoUpload.single("logo"), uploadLogo);
+router.get("/", authenticate, asyncHandler(getConfig));
+router.put("/", authenticate, authorize("ADMIN"), asyncHandler(updateConfig));
+router.post("/logo", authenticate, authorize("ADMIN"), logoUpload.single("logo"), asyncHandler(uploadLogo));
 
 export default router;
 

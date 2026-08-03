@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { authenticate, authorize } from "../../middleware/auth";
+import { asyncHandler } from "../../middleware/asyncHandler";
 import { prisma } from "../../config/database";
 import { validate } from "../../middleware/validate";
 import { z } from "zod";
@@ -44,7 +45,7 @@ const recoverSchema = z.object({
 // --- Rutas Admin ---
 
 // Listar todos los usuarios
-router.get("/", authenticate, authorize("ADMIN"), async (_req: Request, res: Response) => {
+router.get("/", authenticate, authorize("ADMIN"), asyncHandler(async (_req: Request, res: Response) => {
   const users = await prisma.user.findMany({
     select: {
       id: true, cedula: true, firstName: true, lastName: true,
@@ -54,10 +55,10 @@ router.get("/", authenticate, authorize("ADMIN"), async (_req: Request, res: Res
     orderBy: { firstName: "asc" },
   });
   return res.json(users);
-});
+}));
 
 // Crear usuario (admin)
-router.post("/", authenticate, authorize("ADMIN"), validate(createUserSchema), async (req: Request, res: Response) => {
+router.post("/", authenticate, authorize("ADMIN"), validate(createUserSchema), asyncHandler(async (req: Request, res: Response) => {
   const { cedula, firstName, lastName, phone, email, username, password, role } = req.body;
 
   const existingCedula = await prisma.user.findUnique({ where: { cedula } });
@@ -78,10 +79,10 @@ router.post("/", authenticate, authorize("ADMIN"), validate(createUserSchema), a
   });
 
   return res.status(201).json(user);
-});
+}));
 
 // Actualizar usuario (admin)
-router.put("/:id", authenticate, authorize("ADMIN"), validate(updateUserSchema), async (req: Request, res: Response) => {
+router.put("/:id", authenticate, authorize("ADMIN"), validate(updateUserSchema), asyncHandler(async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const data: any = { ...req.body };
 
@@ -100,10 +101,10 @@ router.put("/:id", authenticate, authorize("ADMIN"), validate(updateUserSchema),
   });
 
   return res.json(user);
-});
+}));
 
 // Regenerar código de recuperación (admin)
-router.post("/:id/regenerate-code", authenticate, authorize("ADMIN"), async (req: Request, res: Response) => {
+router.post("/:id/regenerate-code", authenticate, authorize("ADMIN"), asyncHandler(async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const recoveryCode = generateRecoveryCode();
 
@@ -114,11 +115,11 @@ router.post("/:id/regenerate-code", authenticate, authorize("ADMIN"), async (req
   });
 
   return res.json(user);
-});
+}));
 
 // --- Ruta Pública: Recuperar contraseña ---
 
-router.post("/recover", validate(recoverSchema), async (req: Request, res: Response) => {
+router.post("/recover", validate(recoverSchema), asyncHandler(async (req: Request, res: Response) => {
   const { cedula, recoveryCode, newPassword } = req.body;
 
   const user = await prisma.user.findUnique({ where: { cedula } });
@@ -137,6 +138,6 @@ router.post("/recover", validate(recoverSchema), async (req: Request, res: Respo
   });
 
   return res.json({ message: "Contraseña actualizada correctamente" });
-});
+}));
 
 export default router;

@@ -3,29 +3,38 @@ import rateLimit from "express-rate-limit";
 import { Express } from "express";
 
 export function setupSecurity(app: Express): void {
-  // Security headers
-  app.use(helmet());
-
-  // Global rate limiting: 100 requests per 15 minutes per IP
   app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: 100,
-      standardHeaders: true,
-      legacyHeaders: false,
-      message: { error: "Demasiadas solicitudes. Intenta de nuevo en 15 minutos." },
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          imgSrc: ["'self'", "data:", "blob:"],
+          connectSrc: ["'self'", "ws:", "wss:"],
+          manifestSrc: ["'self'"],
+        },
+      },
     })
   );
 
-  // Stricter rate limiting for auth endpoints: 10 requests per 15 minutes
   app.use(
-    "/api/auth",
     rateLimit({
       windowMs: 15 * 60 * 1000,
-      max: 10,
+      max: 200,
       standardHeaders: true,
       legacyHeaders: false,
-      message: { error: "Demasiados intentos de login. Espera 15 minutos." },
+      message: { error: "Demasiadas solicitudes. Intenta de nuevo más tarde." },
     })
   );
+
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Demasiados intentos de login, espera 15 minutos." },
+  });
+  app.use("/api/auth", authLimiter);
 }
