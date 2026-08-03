@@ -30,7 +30,9 @@ export function LoginPage() {
       await login(username, password);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al iniciar sesión');
+      const data = err.response?.data;
+      const msg = typeof data?.error === 'string' ? data.error : data?.message || 'Error al iniciar sesión';
+      setError(typeof msg === 'string' ? msg : 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
