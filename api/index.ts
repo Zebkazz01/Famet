@@ -1,3 +1,3 @@
-import app from "../backend/dist/app";
+import app from "../backend/src/app";
 
 export default app;
