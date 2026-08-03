@@ -1,13 +1,31 @@
-import { SerialPort } from "serialport";
-import { ReadlineParser } from "@serialport/parser-readline";
 import { EventEmitter } from "events";
 import { parseScaleData, ScaleReading } from "./scaleParser";
 import { ScaleProcessor, ProcessedReading, ScaleProcessorConfig, WeightUnit } from "./scaleProcessor";
 import { log } from "../config/logger";
 
+// Carga lazy de serialport: en entornos sin binarios nativos (Vercel serverless)
+// la app sigue funcionando; solo los endpoints de balanza quedan degradados.
+interface SerialLib {
+  SerialPort: any;
+  ReadlineParser: any;
+}
+
+const serialLib: SerialLib | null = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const sp = require("serialport");
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const rl = require("@serialport/parser-readline");
+    return { SerialPort: sp.SerialPort, ReadlineParser: rl.ReadlineParser };
+  } catch (e: any) {
+    log.warn(`[scale] serialport no disponible en este entorno: ${e?.message}`);
+    return null;
+  }
+})();
+
 export class ScaleManager extends EventEmitter {
-  private port: SerialPort | null = null;
-  private parser: ReadlineParser | null = null;
+  private port: any = null;
+  private parser: any = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _connected = false;
   private _manualDisconnect = false;
@@ -41,6 +59,15 @@ export class ScaleManager extends EventEmitter {
     this._manualDisconnect = false;
     this.cleanup();
 
+    if (!serialLib) {
+      const err = new Error("serialport no disponible en este entorno");
+      this._connected = false;
+      this.emit("disconnected", err.message);
+      throw err;
+    }
+
+    const { SerialPort, ReadlineParser } = serialLib;
+
     try {
       this.port = new SerialPort({
         path: this.portPath,
@@ -63,7 +90,7 @@ export class ScaleManager extends EventEmitter {
         }
       });
 
-      this.port.on("error", (err) => {
+      this.port.on("error", (err: Error) => {
         log.error(`Puerto serial: ${err.message}`);
         this._connected = false;
         this.emit("disconnected", err.message);
@@ -77,7 +104,7 @@ export class ScaleManager extends EventEmitter {
       });
 
       await new Promise<void>((resolve, reject) => {
-        this.port!.open((err) => {
+        this.port!.open((err: Error | null | undefined) => {
           if (err) {
             reject(err);
           } else {
@@ -181,8 +208,9 @@ export class ScaleManager extends EventEmitter {
   }
 
   static async listPorts() {
-    const ports = await SerialPort.list();
-    return ports.map((p) => ({
+    if (!serialLib) return [];
+    const ports = await serialLib.SerialPort.list();
+    return ports.map((p: any) => ({
       path: p.path,
       manufacturer: p.manufacturer || "",
       vendorId: p.vendorId || "",
@@ -205,7 +233,7 @@ export class ScaleManager extends EventEmitter {
       { vid: "067B", pid: ["2303", "23A3"] },         // Prolific PL2303
     ];
     for (const k of KNOWN) {
-      const match = ports.find((p) =>
+      const match = ports.find((p: any) =>
         p.vendorId.toUpperCase() === k.vid &&
         k.pid.includes(p.productId.toUpperCase()),
       );

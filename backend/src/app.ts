@@ -64,9 +64,11 @@ app.use((req, res, next) => {
 app.get("/api/health", async (_req, res) => {
   let dbOk = true;
   let dbErr: string | null = null;
+  let initialized = false;
   try {
     const { prisma } = await import("./config/database");
     await prisma.$queryRaw`SELECT 1`;
+    initialized = (await prisma.user.count()) > 0;
   } catch (e: any) {
     dbOk = false;
     dbErr = e.message;
@@ -74,6 +76,9 @@ app.get("/api/health", async (_req, res) => {
   res.json({
     status: "ok",
     database: dbOk,
+    initialized,
+    ready: dbOk,
+    scale: scaleManager.connected,
     uptime: Math.floor(process.uptime()),
     dbError: dbErr,
   });
